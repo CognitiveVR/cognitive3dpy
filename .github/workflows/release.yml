@@ -38,7 +38,7 @@ jobs:
 
       - name: Publish to PyPI
         run: |
-          pip install uv
+          pip install 'uv==0.4.20'
           uv build
           uv publish
         env:
