@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "name": "Fire Safety",
+    "enabled": true,
+    "objectiveVersions": [
+      {
+        "id": 100,
+        "isActive": true,
+        "objectiveComponents": [
+          {
+            "sequenceNumber": 1,
+            "type": "eventstep",
+            "eventName": "grab_extinguisher",
+            "occurrenceOperator": "eq",
+            "occurrenceValue": 1,
+            "name": "Grab Extinguisher",
+            "isStep": true
+          },
+          {
+            "sequenceNumber": 2,
+            "type": "gazestep",
+            "dynamicObjectIds": ["obj-1"],
+            "durationOperator": "gte",
+            "durationValue": 0.1,
+            "occurrenceOperator": "gte",
+            "occurrenceValue": 1,
+            "name": "Look at Object",
+            "isStep": true
+          }
+        ]
+      }
+    ]
+  }
+]

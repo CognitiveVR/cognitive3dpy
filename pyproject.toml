@@ -1,0 +1,53 @@
+[project]
+name = "cognitive3dpy"
+version = "1.0.0"
+description = "Python client for the Cognitive3D analytics API."
+readme = "README.md"
+authors = [
+    { name = "Mona", email = "monajhzhu@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28.1",
+    "polars>=1.38.1",
+    "python-dateutil>=2.9.0.post0",
+]
+
+[project.optional-dependencies]
+pandas = [
+    "pandas>=3.0",
+    "pyarrow>=23.0.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.6,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "python-semantic-release>=9.0.0",
+    "respx>=0.22.0",
+    "ruff>=0.15.2",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+commit_message = "chore(release): v{version} [skip ci]"
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = ["^chore"]

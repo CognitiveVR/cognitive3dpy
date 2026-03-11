@@ -1,0 +1,36 @@
+{
+    "count": 1,
+    "pages": 1,
+    "results": [
+        {
+            "sessionId": "sess-001",
+            "projectId": 1234,
+            "participantId": "user-42",
+            "userKey": "uk-001",
+            "deviceId": "dev-001",
+            "user": "TestUser",
+            "date": "2025-06-15T14:30:00Z",
+            "endDate": "2025-06-15T15:00:00Z",
+            "duration": 1800000,
+            "hmd": "Quest 3",
+            "tags": [],
+            "properties": {},
+            "objectiveResults": {
+                "100": [
+                    {
+                        "step": 1,
+                        "timestamp": 1718459400000,
+                        "duration": 12500,
+                        "result": "succeeded"
+                    },
+                    {
+                        "step": 2,
+                        "timestamp": 1718459412500,
+                        "duration": 8200,
+                        "result": "failed"
+                    }
+                ]
+            }
+        }
+    ]
+}

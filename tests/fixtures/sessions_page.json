@@ -1,0 +1,42 @@
+{
+  "count": 2,
+  "pages": 1,
+  "results": [
+    {
+      "sessionId": "session-001",
+      "projectId": 1234,
+      "participantId": "p001",
+      "userKey": "user-key-1",
+      "deviceId": "device-001",
+      "user": "device-001",
+      "date": "2025-06-01T10:00:00Z",
+      "endDate": "2025-06-01T10:30:00Z",
+      "duration": 1800000,
+      "hmd": "Quest 3",
+      "tags": ["production"],
+      "properties": {
+        "c3d.app.name": "MyApp",
+        "c3d.session_tag.test": false,
+        "c3d.session_tag.junk": false
+      }
+    },
+    {
+      "sessionId": "session-002",
+      "projectId": 1234,
+      "participantId": "p002",
+      "userKey": "user-key-2",
+      "deviceId": "device-002",
+      "user": "device-002",
+      "date": "2025-06-02T09:00:00Z",
+      "endDate": "2025-06-02T09:45:00Z",
+      "duration": 2700000,
+      "hmd": "Quest 3",
+      "tags": [],
+      "properties": {
+        "c3d.app.name": "MyApp",
+        "c3d.session_tag.test": false,
+        "c3d.session_tag.junk": false
+      }
+    }
+  ]
+}

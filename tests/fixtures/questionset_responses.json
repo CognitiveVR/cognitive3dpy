@@ -1,0 +1,16 @@
+[
+  [
+    {"count": 10, "skipped": false, "value": "0"},
+    {"count": 5, "skipped": false, "value": "1"},
+    {"count": 2, "skipped": true, "value": null}
+  ],
+  [
+    {"count": 3, "skipped": false, "value": "7"},
+    {"count": 8, "skipped": false, "value": "9"}
+  ],
+  [
+    {"count": 6, "skipped": false, "value": "0"},
+    {"count": 4, "skipped": false, "value": "1"},
+    {"count": 2, "skipped": false, "value": "2"}
+  ]
+]

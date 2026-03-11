@@ -1,0 +1,38 @@
+{
+  "count": 1,
+  "pages": 1,
+  "results": [
+    {
+      "sessionId": "session-001",
+      "projectId": 1234,
+      "participantId": "p001",
+      "userKey": "user-key-1",
+      "deviceId": "device-001",
+      "user": "device-001",
+      "date": "2025-06-01T10:00:00Z",
+      "duration": 1800000,
+      "events": [
+        {
+          "name": "grab_extinguisher",
+          "date": "2025-06-01T10:05:00Z",
+          "x": 1.0,
+          "y": 0.0,
+          "z": 2.0,
+          "object": "obj-1",
+          "parentSceneVersionId": 11,
+          "properties": {"intensity": 0.8}
+        },
+        {
+          "name": "look_at_sign",
+          "date": "2025-06-01T10:10:00Z",
+          "x": 0.5,
+          "y": 1.0,
+          "z": 1.5,
+          "object": null,
+          "parentSceneVersionId": 11,
+          "properties": {}
+        }
+      ]
+    }
+  ]
+}

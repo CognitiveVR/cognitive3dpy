@@ -1,0 +1,16 @@
+{
+  "survey:1": {
+    "id": "survey:1",
+    "name": "survey",
+    "projectId": 1234,
+    "version": 1,
+    "title": "Session Survey",
+    "questions": [
+      {"type": "BOOLEAN", "title": "Were you standing?", "answers": []},
+      {"type": "SCALE", "title": "How comfortable?", "answers": []},
+      {"type": "MULTIPLE", "title": "Your experience?", "answers": [
+        {"answer": "Great"}, {"answer": "Okay"}, {"answer": "Poor"}
+      ]}
+    ]
+  }
+}
