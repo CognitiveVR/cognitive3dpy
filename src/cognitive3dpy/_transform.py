@@ -51,6 +51,8 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "c3d_geo_country",
     "c3d_geo_subdivision",
     "c3d_geo_city",
+    "c3d_geo_latitude",
+    "c3d_geo_longitude",
     "c3d_roomsize_meters",
     # Key metrics (top-level scores)
     "c3d_metrics_fps_score",
