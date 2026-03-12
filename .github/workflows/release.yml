@@ -27,16 +27,27 @@ jobs:
         run: pip install python-semantic-release>=9.0.0
 
       - name: Bump version and tag
-        run: semantic-release version
+        id: version
+        run: |
+          BEFORE=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          semantic-release version
+          AFTER=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+          if [ "$BEFORE" != "$AFTER" ]; then
+            echo "released=true" >> $GITHUB_OUTPUT
+          else
+            echo "released=false" >> $GITHUB_OUTPUT
+          fi
         env:
           GH_TOKEN: ${{ secrets.PSR_TOKEN }}
 
       - name: Create GitHub Release
+        if: steps.version.outputs.released == 'true'
         run: semantic-release publish
         env:
           GH_TOKEN: ${{ secrets.PSR_TOKEN }}
 
       - name: Publish to PyPI
+        if: steps.version.outputs.released == 'true'
         run: |
           pip install 'uv==0.4.20'
           uv build
