@@ -221,6 +221,23 @@ def coerce_types(df: pl.DataFrame) -> pl.DataFrame:
     if "tags" in cols and df.schema["tags"] == pl.List(pl.Utf8):
         df = df.with_columns(pl.col("tags").list.join(", ").alias("tags"))
 
+    # Cast all numeric metric columns to Float64 so pandas sees float64, not int64,
+    # even when the API returns whole-number values (e.g. 100 instead of 100.0).
+    _FLOAT_PREFIXES = ("c3d_metrics_", "c3d_metric_components_")
+    _NUMERIC_DTYPES = (
+        pl.Int8, pl.Int16, pl.Int32, pl.Int64,
+        pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64,
+        pl.Float32, pl.Float64,
+    )
+    float_casts = [
+        pl.col(col).cast(pl.Float64)
+        for col in df.columns
+        if (col.startswith(_FLOAT_PREFIXES) or col == "c3d_roomsize_meters")
+        and isinstance(df.schema[col], _NUMERIC_DTYPES)
+    ]
+    if float_casts:
+        df = df.with_columns(float_casts)
+
     return df
 
 

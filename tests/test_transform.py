@@ -98,6 +98,74 @@ def test_coerce_types_tags_list_to_string():
     assert result["tags"][0] == "a, b"
 
 
+def test_coerce_types_metric_int_cast_to_float64():
+    # API may return whole-number scores as integers; they must become Float64.
+    df = pl.DataFrame(
+        {
+            "c3d_metrics_fps_score": pl.Series([100], dtype=pl.Int64),
+            "c3d_metrics_presence_score": pl.Series([75], dtype=pl.Int64),
+        }
+    )
+    result = coerce_types(df)
+    assert result.schema["c3d_metrics_fps_score"] == pl.Float64
+    assert result.schema["c3d_metrics_presence_score"] == pl.Float64
+    assert result["c3d_metrics_fps_score"][0] == pytest.approx(100.0)
+
+
+def test_coerce_types_metric_components_int_cast_to_float64():
+    df = pl.DataFrame(
+        {
+            "c3d_metric_components_comfort_score_head_orientation_score": pl.Series(
+                [80], dtype=pl.Int64
+            ),
+        }
+    )
+    result = coerce_types(df)
+    assert (
+        result.schema["c3d_metric_components_comfort_score_head_orientation_score"]
+        == pl.Float64
+    )
+
+
+def test_coerce_types_roomsize_meters_int_cast_to_float64():
+    df = pl.DataFrame({"c3d_roomsize_meters": pl.Series([9], dtype=pl.Int64)})
+    result = coerce_types(df)
+    assert result.schema["c3d_roomsize_meters"] == pl.Float64
+
+
+def test_coerce_types_non_metric_int_unchanged():
+    # project_id and scene_version_id are identifiers and must stay Int64.
+    df = pl.DataFrame(
+        {
+            "project_id": pl.Series([42], dtype=pl.Int64),
+            "scene_version_id": pl.Series([7], dtype=pl.Int64),
+        }
+    )
+    result = coerce_types(df)
+    assert result.schema["project_id"] == pl.Int64
+    assert result.schema["scene_version_id"] == pl.Int64
+
+
+def test_coerce_types_metric_already_float64_unchanged():
+    df = pl.DataFrame(
+        {"c3d_metrics_fps_score": pl.Series([99.5], dtype=pl.Float64)}
+    )
+    result = coerce_types(df)
+    assert result.schema["c3d_metrics_fps_score"] == pl.Float64
+    assert result["c3d_metrics_fps_score"][0] == pytest.approx(99.5)
+
+
+def test_coerce_types_metric_pandas_dtype_is_float64():
+    pytest.importorskip("pyarrow")
+    pytest.importorskip("pandas")
+    df = pl.DataFrame(
+        {"c3d_metrics_fps_score": pl.Series([100], dtype=pl.Int64)}
+    )
+    result = coerce_types(df)
+    pandas_df = result.to_pandas()
+    assert str(pandas_df["c3d_metrics_fps_score"].dtype) == "float64"
+
+
 # --- join_scene_names ---
 
 
