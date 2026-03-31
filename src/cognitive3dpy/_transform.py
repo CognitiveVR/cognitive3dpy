@@ -169,7 +169,25 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     if "properties" in df.columns:
         dtype = df.schema["properties"]
         if isinstance(dtype, pl.Struct):
-            df = df.unnest("properties")
+            existing_cols = set(df.columns) - {"properties"}
+            prop_fields = [f.name for f in dtype.fields]
+            has_dupes = any(f in existing_cols for f in prop_fields)
+            if has_dupes:
+                exprs = []
+                for f in prop_fields:
+                    alias = f
+                    if alias in existing_cols:
+                        n = 2
+                        while f"{alias}_{n}" in existing_cols:
+                            n += 1
+                        alias = f"{alias}_{n}"
+                    existing_cols.add(alias)
+                    exprs.append(
+                        pl.col("properties").struct.field(f).alias(alias)
+                    )
+                df = df.with_columns(exprs).drop("properties")
+            else:
+                df = df.unnest("properties")
 
     # Apply explicit renames for special cases.
     existing = set(df.columns)
@@ -177,10 +195,17 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     if explicit:
         df = df.rename(explicit)
 
-    # Clean all remaining column names.
+    # Clean all remaining column names, suffixing duplicates.
     clean_map: dict[str, str] = {}
+    seen_clean: set[str] = set()
     for col in df.columns:
         clean = _clean_name(col)
+        if clean in seen_clean:
+            n = 2
+            while f"{clean}_{n}" in seen_clean:
+                n += 1
+            clean = f"{clean}_{n}"
+        seen_clean.add(clean)
         if clean != col:
             clean_map[col] = clean
 
