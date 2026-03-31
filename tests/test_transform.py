@@ -218,7 +218,7 @@ def test_to_output_pandas():
     assert isinstance(result, pd.DataFrame)
 
 
-def test_normalize_columns_duplicate_property_gets_suffix():
+def test_normalize_columns_duplicate_property_dropped(caplog):
     df = pl.DataFrame(
         {
             "c3d_participant_oculus_username": ["top_level"],
@@ -230,18 +230,21 @@ def test_normalize_columns_duplicate_property_gets_suffix():
             pl.Struct({"c3d_participant_oculus_username": pl.Utf8})
         )
     )
-    result = normalize_columns(df)
+    with caplog.at_level(logging.WARNING, logger="cognitive3dpy._transform"):
+        result = normalize_columns(df)
     assert "c3d_participant_oculus_username" in result.columns
-    assert "c3d_participant_oculus_username_2" in result.columns
     assert result["c3d_participant_oculus_username"][0] == "top_level"
-    assert result["c3d_participant_oculus_username_2"][0] == "from_props"
+    assert "properties" not in result.columns
+    assert any("Dropping duplicate property field" in m for m in caplog.messages)
 
 
-def test_normalize_columns_clean_name_collision_gets_suffix():
+def test_normalize_columns_clean_name_collision_dropped(caplog):
     df = pl.DataFrame({"c3d.foo.bar": ["a"], "c3d_foo_bar": ["b"]})
-    result = normalize_columns(df)
+    with caplog.at_level(logging.WARNING, logger="cognitive3dpy._transform"):
+        result = normalize_columns(df)
     assert "c3d_foo_bar" in result.columns
-    assert "c3d_foo_bar_2" in result.columns
+    assert result.shape[1] == 1
+    assert any("cleans to" in m for m in caplog.messages)
 
 
 def test_normalize_columns_no_duplicates_unchanged():

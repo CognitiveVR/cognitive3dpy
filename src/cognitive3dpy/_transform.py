@@ -173,21 +173,23 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
         if isinstance(dtype, pl.Struct):
             existing_cols = set(df.columns) - {"properties"}
             prop_fields = [f.name for f in dtype.fields]
-            has_dupes = any(f in existing_cols for f in prop_fields)
-            if has_dupes:
-                exprs = []
-                for f in prop_fields:
-                    alias = f
-                    if alias in existing_cols:
-                        n = 2
-                        while f"{alias}_{n}" in existing_cols:
-                            n += 1
-                        alias = f"{alias}_{n}"
-                    existing_cols.add(alias)
-                    exprs.append(
-                        pl.col("properties").struct.field(f).alias(alias)
+            dupes = [f for f in prop_fields if f in existing_cols]
+            if dupes:
+                # Extract only non-duplicate fields, drop duplicates with a warning.
+                for d in dupes:
+                    logger.warning(
+                        "Dropping duplicate property field %r "
+                        "(already exists as a top-level column).",
+                        d,
                     )
-                df = df.with_columns(exprs).drop("properties")
+                keep = [f for f in prop_fields if f not in existing_cols]
+                if keep:
+                    exprs = [
+                        pl.col("properties").struct.field(f).alias(f)
+                        for f in keep
+                    ]
+                    df = df.with_columns(exprs)
+                df = df.drop("properties")
             else:
                 df = df.unnest("properties")
 
@@ -197,20 +199,26 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     if explicit:
         df = df.rename(explicit)
 
-    # Clean all remaining column names, suffixing duplicates.
+    # Clean all remaining column names, dropping duplicates.
     clean_map: dict[str, str] = {}
     seen_clean: set[str] = set()
+    drop_cols: list[str] = []
     for col in df.columns:
         clean = _clean_name(col)
         if clean in seen_clean:
-            n = 2
-            while f"{clean}_{n}" in seen_clean:
-                n += 1
-            clean = f"{clean}_{n}"
+            logger.warning(
+                "Dropping column %r (cleans to %r which already exists).",
+                col,
+                clean,
+            )
+            drop_cols.append(col)
+            continue
         seen_clean.add(clean)
         if clean != col:
             clean_map[col] = clean
 
+    if drop_cols:
+        df = df.drop(drop_cols)
     if clean_map:
         df = df.rename(clean_map)
 
