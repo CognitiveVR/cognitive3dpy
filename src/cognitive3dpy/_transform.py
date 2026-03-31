@@ -171,7 +171,27 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     if "properties" in df.columns:
         dtype = df.schema["properties"]
         if isinstance(dtype, pl.Struct):
-            df = df.unnest("properties")
+            existing_cols = set(df.columns) - {"properties"}
+            prop_fields = [f.name for f in dtype.fields]
+            dupes = [f for f in prop_fields if f in existing_cols]
+            if dupes:
+                # Extract only non-duplicate fields, drop duplicates with a warning.
+                for d in dupes:
+                    logger.warning(
+                        "Dropping duplicate property field %r "
+                        "(already exists as a top-level column).",
+                        d,
+                    )
+                keep = [f for f in prop_fields if f not in existing_cols]
+                if keep:
+                    exprs = [
+                        pl.col("properties").struct.field(f).alias(f)
+                        for f in keep
+                    ]
+                    df = df.with_columns(exprs)
+                df = df.drop("properties")
+            else:
+                df = df.unnest("properties")
 
     # Apply explicit renames for special cases.
     existing = set(df.columns)
@@ -179,13 +199,26 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     if explicit:
         df = df.rename(explicit)
 
-    # Clean all remaining column names.
+    # Clean all remaining column names, dropping duplicates.
     clean_map: dict[str, str] = {}
+    seen_clean: set[str] = set()
+    drop_cols: list[str] = []
     for col in df.columns:
         clean = _clean_name(col)
+        if clean in seen_clean:
+            logger.warning(
+                "Dropping column %r (cleans to %r which already exists).",
+                col,
+                clean,
+            )
+            drop_cols.append(col)
+            continue
+        seen_clean.add(clean)
         if clean != col:
             clean_map[col] = clean
 
+    if drop_cols:
+        df = df.drop(drop_cols)
     if clean_map:
         df = df.rename(clean_map)
 
