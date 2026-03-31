@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.0.2 (2026-03-31)
+
+### Bug Fixes
+
+- Drop duplicate columns instead of suffixing with _2
+  ([`cf98c32`](https://github.com/CognitiveVR/cognitive3dpy/commit/cf98c3253adf8ba2e0f3ed1007e1044621d05cc8))
+
+- Handle duplicate column names in normalize_columns()
+  ([`c4d95e9`](https://github.com/CognitiveVR/cognitive3dpy/commit/c4d95e9678886bdd22b8ff309b31331d4db00925))
+
+
 ## v1.0.1 (2026-03-12)
 
 ### Bug Fixes
