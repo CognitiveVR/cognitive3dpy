@@ -218,6 +218,48 @@ def test_to_output_pandas():
     assert isinstance(result, pd.DataFrame)
 
 
+def test_normalize_columns_duplicate_property_gets_suffix():
+    df = pl.DataFrame(
+        {
+            "c3d_participant_oculus_username": ["top_level"],
+            "properties": [{"c3d_participant_oculus_username": "from_props"}],
+        }
+    )
+    df = df.with_columns(
+        pl.col("properties").cast(
+            pl.Struct({"c3d_participant_oculus_username": pl.Utf8})
+        )
+    )
+    result = normalize_columns(df)
+    assert "c3d_participant_oculus_username" in result.columns
+    assert "c3d_participant_oculus_username_2" in result.columns
+    assert result["c3d_participant_oculus_username"][0] == "top_level"
+    assert result["c3d_participant_oculus_username_2"][0] == "from_props"
+
+
+def test_normalize_columns_clean_name_collision_gets_suffix():
+    df = pl.DataFrame({"c3d.foo.bar": ["a"], "c3d_foo_bar": ["b"]})
+    result = normalize_columns(df)
+    assert "c3d_foo_bar" in result.columns
+    assert "c3d_foo_bar_2" in result.columns
+
+
+def test_normalize_columns_no_duplicates_unchanged():
+    df = pl.DataFrame(
+        {
+            "sessionId": ["s1"],
+            "properties": [{"c3d.app.name": "MyApp"}],
+        }
+    )
+    df = df.with_columns(
+        pl.col("properties").cast(pl.Struct({"c3d.app.name": pl.Utf8}))
+    )
+    result = normalize_columns(df)
+    assert "session_id" in result.columns
+    assert "c3d_app_name" in result.columns
+    assert "properties" not in result.columns
+
+
 def test_to_output_invalid():
     df = pl.DataFrame({"a": [1]})
     with pytest.raises(ValueError, match="output must be"):
