@@ -14,7 +14,9 @@
             "duration": 1800000,
             "hmd": "Quest 3",
             "tags": [],
-            "properties": {},
+            "properties": {
+                "c3d.device.hmd_type": "Quest 3"
+            },
             "objectiveResults": {
                 "100": [
                     {

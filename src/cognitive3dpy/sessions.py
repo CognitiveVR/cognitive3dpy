@@ -140,9 +140,23 @@ def c3d_sessions(
             f"session_type must be 'project' or 'scene', got {session_type!r}"
         )
 
+    # Drop the legacy top-level "hmd" field before DataFrame construction.
+    # This field has inconsistent types across projects (null/int/string)
+    # which causes Polars schema inference failures. The same data is
+    # available reliably via the properties struct as c3d_device_hmd_type.
+    for r in results:
+        r.pop("hmd", None)
+
     df = pl.DataFrame(results)
     df = normalize_columns(df)
     df = coerce_types(df)
+
+    # Duplicate c3d_device_hmd_type under the legacy "hmd" name so
+    # downstream consumers (Fabric notebook, semantic model) that
+    # reference "hmd" continue to work without schema changes.
+    if "c3d_device_hmd_type" in df.columns:
+        df = df.with_columns(pl.col("c3d_device_hmd_type").alias("hmd"))
+
     if lookup:
         df = join_scene_names(df, lookup)
 
