@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.4 (2026-04-01)
+
+### Bug Fixes
+
+- Source hmd column from properties instead of legacy top-level field
+  ([`aa58c74`](https://github.com/CognitiveVR/cognitive3dpy/commit/aa58c740b88540f3c12f1f25010f412b565a5091))
+
+
 ## v1.0.3 (2026-04-01)
 
 ### Bug Fixes
