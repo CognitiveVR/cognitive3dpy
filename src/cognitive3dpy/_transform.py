@@ -45,6 +45,7 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "c3d_app_version",
     "c3d_version",
     "c3d_device_type",
+    "c3d_device_hmd_type",
     "c3d_device_os",
     "c3d_device_model",
     # Location & environment
