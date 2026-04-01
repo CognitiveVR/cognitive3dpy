@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.3 (2026-04-01)
+
+### Bug Fixes
+
+- Cast Null-typed columns to String to prevent downstream schema errors
+  ([`a5dc021`](https://github.com/CognitiveVR/cognitive3dpy/commit/a5dc021515260ea535f421efab4176f2df62e172))
+
+
 ## v1.0.2 (2026-03-31)
 
 ### Bug Fixes
