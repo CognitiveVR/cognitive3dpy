@@ -271,6 +271,12 @@ def coerce_types(df: pl.DataFrame) -> pl.DataFrame:
     if float_casts:
         df = df.with_columns(float_casts)
 
+    # Cast Null-typed columns to String so downstream consumers don't choke
+    # when non-null values appear in later batches/appends.
+    null_cols = [name for name, dtype in df.schema.items() if dtype == pl.Null]
+    if null_cols:
+        df = df.with_columns([pl.col(c).cast(pl.Utf8) for c in null_cols])
+
     return df
 
 

@@ -166,6 +166,13 @@ def test_coerce_types_metric_pandas_dtype_is_float64():
     assert str(pandas_df["c3d_metrics_fps_score"].dtype) == "float64"
 
 
+def test_coerce_types_casts_null_columns_to_string():
+    df = pl.DataFrame({"session_id": ["abc"], "empty_col": [None]})
+    assert df.schema["empty_col"] == pl.Null
+    result = coerce_types(df)
+    assert result.schema["empty_col"] == pl.Utf8
+
+
 # --- join_scene_names ---
 
 
