@@ -112,6 +112,13 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     # Session flags
     "c3d_session_tag_junk",
     "c3d_session_tag_test",
+    # Data-availability flags
+    "has_gaze",
+    "has_fixation",
+    "has_event",
+    "has_dynamic",
+    "has_sensor",
+    "has_boundary",
 ]
 
 
