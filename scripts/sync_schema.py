@@ -41,6 +41,19 @@ PROPERTY_SECTION_MAP: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
+# Property type overrides
+# Corrects known misclassifications in the YAML where a property is listed
+# in the wrong section (e.g. numeric data under the textual section).
+# ---------------------------------------------------------------------------
+
+PROPERTY_TYPE_OVERRIDES: dict[str, str] = {
+    "c3d.participant.height": "pl.Float64",
+    "c3d.participant.armlength": "pl.Float64",
+    "c3d.participant.Age": "pl.Float64",
+    "c3d.multiplayer.port": "pl.Int64",
+}
+
+# ---------------------------------------------------------------------------
 # YAML location candidates
 # ---------------------------------------------------------------------------
 
@@ -91,6 +104,8 @@ def parse_properties(properties_dict: dict) -> dict[str, str]:
     """Parse a session_properties or event_properties section.
 
     Properties are grouped by type section (textual/numerical/boolean).
+    After section-based assignment, ``PROPERTY_TYPE_OVERRIDES`` are applied
+    to correct known misclassifications in the YAML.
     Returns ``{property_name: polars_type_string}``.
     """
     result: dict[str, str] = {}
@@ -101,7 +116,7 @@ def parse_properties(properties_dict: dict) -> dict[str, str]:
         if not isinstance(section_entries, dict):
             continue
         for prop_name in section_entries:
-            result[prop_name] = polars_type
+            result[prop_name] = PROPERTY_TYPE_OVERRIDES.get(prop_name, polars_type)
     return result
 
 

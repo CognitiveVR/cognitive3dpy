@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Generated: 2026-04-13T21:02:01Z
+Generated: 2026-04-13T21:13:12Z
 Source: slicer_fields.yaml
 """
 
@@ -85,9 +85,9 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.roomsizeDescriptionMeters": pl.Utf8,
     "c3d.participant.id": pl.Utf8,
     "c3d.participant.name": pl.Utf8,
-    "c3d.participant.height": pl.Utf8,
-    "c3d.participant.armlength": pl.Utf8,
-    "c3d.participant.Age": pl.Utf8,
+    "c3d.participant.height": pl.Float64,
+    "c3d.participant.armlength": pl.Float64,
+    "c3d.participant.Age": pl.Float64,
     "c3d.participant.Sex": pl.Utf8,
     "c3d.participant.Color": pl.Utf8,
     "c3d.participant.Job": pl.Utf8,
@@ -98,7 +98,7 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.multiplayer.photonServerAddress": pl.Utf8,
     "c3d.multiplayer.photonRoomName": pl.Utf8,
     "c3d.multiplayer.photonGameMode": pl.Utf8,
-    "c3d.multiplayer.port": pl.Utf8,
+    "c3d.multiplayer.port": pl.Int64,
     "cvr.vr.display.family": pl.Utf8,
     "cvr.vr.display.model": pl.Utf8,
     "cvr.vr.enabled": pl.Utf8,
