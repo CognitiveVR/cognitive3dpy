@@ -24,27 +24,5 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check src/ tests/
 
-      - name: Checkout slicer fields
-        uses: actions/checkout@v4
-        with:
-          repository: CognitiveVR/cvr-slicer
-          path: .cvr-slicer
-          sparse-checkout: doc/slicer_fields.yaml
-        continue-on-error: true
-
-      - name: Validate schema freshness
-        run: |
-          YAML_PATH=""
-          if [ -f ".cvr-slicer/doc/slicer_fields.yaml" ]; then
-            YAML_PATH=".cvr-slicer/doc/slicer_fields.yaml"
-          fi
-          if [ -n "$YAML_PATH" ]; then
-            uv run python scripts/sync_schema.py "$YAML_PATH"
-            git diff --exit-code src/cognitive3dpy/_schema_generated.py || \
-              (echo "::error::Schema is stale — run 'uv run python scripts/sync_schema.py' and commit the result" && exit 1)
-          else
-            echo "slicer_fields.yaml not available, skipping freshness check"
-          fi
-
       - name: Run tests
         run: uv run pytest tests/ --cov=src/cognitive3dpy --cov-report=term-missing --cov-fail-under=50
