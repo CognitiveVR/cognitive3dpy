@@ -28,14 +28,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: CognitiveVR/cvr-slicer
-          path: ../cvr-slicer
+          path: .cvr-slicer
           sparse-checkout: doc/slicer_fields.yaml
         continue-on-error: true
 
       - name: Validate schema freshness
         run: |
-          if [ -f "../cvr-slicer/doc/slicer_fields.yaml" ] || [ -f "../cvr-cortex/doc/slicer_fields.yaml" ]; then
-            uv run python scripts/sync_schema.py
+          YAML_PATH=""
+          if [ -f ".cvr-slicer/doc/slicer_fields.yaml" ]; then
+            YAML_PATH=".cvr-slicer/doc/slicer_fields.yaml"
+          fi
+          if [ -n "$YAML_PATH" ]; then
+            uv run python scripts/sync_schema.py "$YAML_PATH"
             git diff --exit-code src/cognitive3dpy/_schema_generated.py || \
               (echo "::error::Schema is stale — run 'uv run python scripts/sync_schema.py' and commit the result" && exit 1)
           else
