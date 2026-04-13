@@ -120,14 +120,25 @@ def parse_properties(properties_dict: dict) -> dict[str, str]:
     return result
 
 
-def format_dict(name: str, entries: dict[str, str], indent: str = "    ") -> str:
+def format_dict(
+    name: str,
+    entries: dict[str, str],
+    indent: str = "    ",
+    max_line: int = 88,
+) -> str:
     """Format a dict as a Python constant declaration."""
     if not entries:
         return f"{name}: dict[str, pl.DataType] = {{}}"
 
     lines = [f"{name}: dict[str, pl.DataType] = {{"]
     for key, polars_type in entries.items():
-        lines.append(f'{indent}"{key}": {polars_type},')
+        single = f'{indent}"{key}": {polars_type},'
+        if len(single) <= max_line:
+            lines.append(single)
+        else:
+            # Break long lines across two lines
+            lines.append(f'{indent}"{key}":')
+            lines.append(f"{indent}    {polars_type},")
     lines.append("}")
     return "\n".join(lines)
 

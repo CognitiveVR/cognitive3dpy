@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Generated: 2026-04-13T22:16:55Z
+Generated: 2026-04-13T22:25:36Z
 Source: slicer_fields.yaml
 """
 
@@ -145,12 +145,16 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.metric_components.presence_score.spatial_coverage_score": pl.Float64,
     "c3d.metric_components.presence_score.interruption_score": pl.Float64,
     "c3d.metric_components.comfort_score.head_orientation_score": pl.Float64,
-    "c3d.metric_components.comfort_score.head_orientation_score_pitch_score": pl.Float64,
+    "c3d.metric_components.comfort_score.head_orientation_score_pitch_score":
+        pl.Float64,
     "c3d.metric_components.comfort_score.head_orientation_score_roll_score": pl.Float64,
     "c3d.metric_components.comfort_score.controller_ergonomic_score": pl.Float64,
-    "c3d.metric_components.comfort_score.controller_ergonomic_score_forward_reach_score": pl.Float64,
-    "c3d.metric_components.comfort_score.controller_ergonomic_score_horizontal_reach_score": pl.Float64,
-    "c3d.metric_components.comfort_score.controller_ergonomic_score_vertical_reach_score": pl.Float64,
+    "c3d.metric_components.comfort_score.controller_ergonomic_score_forward_reach_score":
+        pl.Float64,
+    "c3d.metric_components.comfort_score.controller_ergonomic_score_horizontal_reach_score":
+        pl.Float64,
+    "c3d.metric_components.comfort_score.controller_ergonomic_score_vertical_reach_score":
+        pl.Float64,
     "c3d.metric_components.pitch_score": pl.Float64,
     "c3d.metric_components.roll_score": pl.Float64,
     "c3d.metric_components.forward_reach_score": pl.Float64,
