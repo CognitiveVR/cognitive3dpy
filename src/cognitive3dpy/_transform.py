@@ -370,8 +370,8 @@ def _parse_date_column(df: pl.DataFrame, col: str) -> pl.DataFrame:
     # Flag impossible dates
     non_null_dates = df[col].drop_nulls()
     if len(non_null_dates) > 0:
-        min_date = dt.datetime(_MIN_YEAR, 1, 1, tzinfo=dt.timezone.utc)
-        max_date = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+        min_date = dt.datetime(_MIN_YEAR, 1, 1, tzinfo=dt.UTC)
+        max_date = dt.datetime.now(dt.UTC) + dt.timedelta(
             days=_MAX_FUTURE_DAYS
         )
 

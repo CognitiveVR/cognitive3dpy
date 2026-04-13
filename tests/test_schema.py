@@ -6,8 +6,8 @@ import polars as pl
 import pytest
 
 from cognitive3dpy._schema import (
-    EXITPOLL_SCHEMA,
     EVENT_SCHEMA,
+    EXITPOLL_SCHEMA,
     SESSION_OBJECTIVE_SCHEMA,
     SESSION_PROPERTY_OVERRIDES,
     SESSION_RAW_OVERRIDES,
@@ -20,7 +20,6 @@ from cognitive3dpy._schema_generated import (
     SESSION_PROPERTY_TYPES,
 )
 from cognitive3dpy._transform import coerce_types
-
 
 # --- Generated schema dicts ---
 
