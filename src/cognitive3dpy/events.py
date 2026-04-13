@@ -11,8 +11,10 @@ import polars as pl
 from cognitive3dpy._filters import build_filters
 from cognitive3dpy._lookups import fetch_objects_lookup, fetch_scenes_metadata
 from cognitive3dpy._pagination import paginate_sessions
+from cognitive3dpy._schema import empty_frame
 from cognitive3dpy._transform import (
     _clean_name,
+    coerce_types,
     join_scene_names,
     to_output,
     warn_if_empty,
@@ -94,8 +96,8 @@ def c3d_events(
 
     if not results:
         if warn_empty:
-            warn_if_empty(pl.DataFrame(), "c3d_events")
-        return to_output(pl.DataFrame(), output)
+            warn_if_empty(empty_frame("event"), "c3d_events")
+        return to_output(empty_frame("event"), output)
 
     # Warn about truncated sessions.
     truncated = [s["sessionId"] for s in results if s.get("eventsLimited")]
@@ -110,10 +112,10 @@ def c3d_events(
 
     if df.is_empty():
         if warn_empty:
-            warn_if_empty(pl.DataFrame(), "c3d_events")
-        return to_output(pl.DataFrame(), output)
+            warn_if_empty(empty_frame("event"), "c3d_events")
+        return to_output(empty_frame("event"), output)
 
-    df = _coerce_event_types(df)
+    df = coerce_types(df)
     df = _resolve_objects(df, fetch_objects_lookup(project_id))
     df = join_scene_names(df, fetch_scenes_metadata(project_id)["lookup"])
 
@@ -160,25 +162,6 @@ def _unnest_events(results: list[dict]) -> pl.DataFrame:
         return pl.DataFrame()
     return pl.DataFrame(flat)
 
-
-def _coerce_event_types(df: pl.DataFrame) -> pl.DataFrame:
-    """Parse date strings and convert duration for event DataFrames."""
-    cols = set(df.columns)
-
-    for date_col in ("session_date", "event_date"):
-        if date_col in cols and df.schema[date_col] == pl.Utf8:
-            df = df.with_columns(
-                pl.col(date_col)
-                .str.to_datetime(time_zone="UTC", time_unit="us")
-                .alias(date_col)
-            )
-
-    if "duration" in cols:
-        df = df.with_columns(
-            (pl.col("duration").cast(pl.Float64) / 1000).alias("duration_s")
-        ).drop("duration")
-
-    return df
 
 
 def _resolve_objects(
