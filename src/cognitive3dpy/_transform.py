@@ -344,10 +344,16 @@ def _parse_date_column(df: pl.DataFrame, col: str) -> pl.DataFrame:
                 col,
             )
 
-    # Parse with strict=False so bad rows get null, not an exception
+    # Parse with explicit ISO 8601 format and strict=False so rows that
+    # don't match become null instead of raising an exception.
     df = df.with_columns(
         pl.col(col)
-        .str.to_datetime(time_zone="UTC", time_unit="us", strict=False)
+        .str.to_datetime(
+            format="%Y-%m-%dT%H:%M:%S%.fZ",
+            time_zone="UTC",
+            time_unit="us",
+            strict=False,
+        )
         .alias(col)
     )
 
