@@ -226,43 +226,84 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
-def coerce_types(df: pl.DataFrame) -> pl.DataFrame:
-    """Parse dates, convert durations, and coerce tags.
+_DATE_COLUMNS = ("session_date", "end_date", "event_date")
+_FLOAT_PREFIXES = ("c3d_metrics_", "c3d_metric_components_")
+_NUMERIC_DTYPES = (
+    pl.Int8, pl.Int16, pl.Int32, pl.Int64,
+    pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64,
+    pl.Float32, pl.Float64,
+)
+_MIN_YEAR = 2015  # Cognitive3D launch
+_MAX_FUTURE_DAYS = 365
+
+
+def coerce_types(
+    df: pl.DataFrame,
+    *,
+    property_overrides: dict[str, pl.DataType] | None = None,
+) -> pl.DataFrame:
+    """Coerce column types for any Cognitive3D DataFrame.
+
+    Handles sessions, events, and objectives in a single unified function.
+    All steps are condition-guarded — columns must exist and have the
+    expected source dtype.
 
     Parameters
     ----------
     df : pl.DataFrame
         DataFrame with already-renamed (snake_case) column names.
+    property_overrides : dict, optional
+        Mapping of normalized property names to Polars types. Merged from
+        the YAML-generated registry and/or the runtime ``propertyNameQueries``
+        lookup. Columns present in *df* whose current dtype doesn't match
+        the declared type are cast.
     """
+    if df.is_empty():
+        return df
+
     cols = set(df.columns)
 
-    # ISO 8601 date strings → Datetime(UTC)
-    for date_col in ("session_date", "end_date"):
+    # 1. Apply property type overrides (from YAML registry + runtime lookup)
+    if property_overrides:
+        override_casts = [
+            pl.col(col_name).cast(target_dtype)
+            for col_name, target_dtype in property_overrides.items()
+            if col_name in cols and df.schema[col_name] != target_dtype
+        ]
+        if override_casts:
+            df = df.with_columns(override_casts)
+
+    # 2. Parse ISO 8601 date strings → Datetime(UTC) with validation
+    for date_col in _DATE_COLUMNS:
         if date_col in cols and df.schema[date_col] == pl.Utf8:
+            df = _parse_date_column(df, date_col)
+
+    # 3. Handle step_timestamp polymorphism (objectives)
+    if "step_timestamp" in cols:
+        dtype = df.schema["step_timestamp"]
+        if dtype == pl.Utf8:
+            df = _parse_date_column(df, "step_timestamp")
+        elif dtype in (pl.Int64, pl.Float64):
+            # Epoch milliseconds → Datetime(us, UTC) for consistency
             df = df.with_columns(
-                pl.col(date_col)
-                .str.to_datetime(time_zone="UTC", time_unit="us")
-                .alias(date_col)
+                (pl.col("step_timestamp").cast(pl.Int64) * 1000)
+                .cast(pl.Datetime("us"))
+                .dt.replace_time_zone("UTC")
+                .alias("step_timestamp")
             )
 
-    # Duration ms → seconds, rename to duration_s
+    # 4. Duration ms → seconds, rename to duration_s
     if "duration" in cols:
         df = df.with_columns(
             (pl.col("duration").cast(pl.Float64) / 1000).alias("duration_s")
         ).drop("duration")
 
-    # Tags list → comma-separated string
+    # 5. Tags list → comma-separated string
     if "tags" in cols and df.schema["tags"] == pl.List(pl.Utf8):
         df = df.with_columns(pl.col("tags").list.join(", ").alias("tags"))
 
-    # Cast all numeric metric columns to Float64 so pandas sees float64, not int64,
-    # even when the API returns whole-number values (e.g. 100 instead of 100.0).
-    _FLOAT_PREFIXES = ("c3d_metrics_", "c3d_metric_components_")
-    _NUMERIC_DTYPES = (
-        pl.Int8, pl.Int16, pl.Int32, pl.Int64,
-        pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64,
-        pl.Float32, pl.Float64,
-    )
+    # 6. Cast numeric metric columns to Float64 (safety net for dynamic columns
+    #    not in the property registry)
     float_casts = [
         pl.col(col).cast(pl.Float64)
         for col in df.columns
@@ -272,11 +313,86 @@ def coerce_types(df: pl.DataFrame) -> pl.DataFrame:
     if float_casts:
         df = df.with_columns(float_casts)
 
-    # Cast Null-typed columns to String so downstream consumers don't choke
-    # when non-null values appear in later batches/appends.
+    # 7. Cast Null-typed columns to String
     null_cols = [name for name, dtype in df.schema.items() if dtype == pl.Null]
     if null_cols:
         df = df.with_columns([pl.col(c).cast(pl.Utf8) for c in null_cols])
+
+    return df
+
+
+def _parse_date_column(df: pl.DataFrame, col: str) -> pl.DataFrame:
+    """Parse an ISO 8601 string column to Datetime(UTC) with validation.
+
+    - Malformed strings become null (only in the date column; rest of row intact).
+    - Logs warnings for parse failures, missing timezone suffixes, and
+      impossible dates (before 2015 or more than a year in the future).
+    """
+    import datetime as dt
+
+    n_before = df[col].null_count()
+
+    # Check for missing timezone suffix before parsing
+    non_null_values = df[col].drop_nulls()
+    if len(non_null_values) > 0:
+        has_tz = non_null_values.str.contains(r"[Zz]|[+\-]\d{2}:\d{2}$")
+        n_no_tz = (~has_tz).sum()
+        if n_no_tz > 0:
+            logger.warning(
+                "%d value(s) in %r lack a timezone suffix — assuming UTC.",
+                n_no_tz,
+                col,
+            )
+
+    # Parse with explicit ISO 8601 format and strict=False so rows that
+    # don't match become null instead of raising an exception.
+    df = df.with_columns(
+        pl.col(col)
+        .str.to_datetime(
+            format="%Y-%m-%dT%H:%M:%S%.fZ",
+            time_zone="UTC",
+            time_unit="us",
+            strict=False,
+        )
+        .alias(col)
+    )
+
+    # Count parse failures
+    n_after = df[col].null_count()
+    n_failed = n_after - n_before
+    if n_failed > 0:
+        logger.warning(
+            "%d value(s) in %r could not be parsed as datetime and are now null.",
+            n_failed,
+            col,
+        )
+
+    # Flag impossible dates
+    non_null_dates = df[col].drop_nulls()
+    if len(non_null_dates) > 0:
+        min_date = dt.datetime(_MIN_YEAR, 1, 1, tzinfo=dt.UTC)
+        max_date = dt.datetime.now(dt.UTC) + dt.timedelta(
+            days=_MAX_FUTURE_DAYS
+        )
+
+        n_too_old = (non_null_dates < min_date).sum()
+        n_too_new = (non_null_dates > max_date).sum()
+
+        if n_too_old > 0:
+            logger.warning(
+                "%d value(s) in %r are before %d — possible data issue.",
+                n_too_old,
+                col,
+                _MIN_YEAR,
+            )
+        if n_too_new > 0:
+            logger.warning(
+                "%d value(s) in %r are more than %d days in the future — "
+                "possible data issue.",
+                n_too_new,
+                col,
+                _MAX_FUTURE_DAYS,
+            )
 
     return df
 
