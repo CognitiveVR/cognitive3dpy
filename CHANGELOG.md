@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.0.5 (2026-04-13)
+
+### Bug Fixes
+
+- Added schema for type casting known columns
+  ([`1f8413a`](https://github.com/CognitiveVR/cognitive3dpy/commit/1f8413a08df252a78195a57f2591cc2fb9752fe6))
+
+- Resolve lint errors in generated schema and transform module
+  ([`d5ab0b2`](https://github.com/CognitiveVR/cognitive3dpy/commit/d5ab0b20a21bd9a51a19410020535f20168b9db4))
+
+
 ## v1.0.4 (2026-04-01)
 
 ### Bug Fixes
