@@ -186,3 +186,14 @@ All data-fetching functions support these session filters:
 - `project_id` — override the default set by `c3d_project()`
 - `output` — `"polars"` (default) or `"pandas"`
 - `warn_empty` — emit a `UserWarning` when 0 rows are returned (default `True`); set to `False` to suppress
+
+## Contributing
+
+```bash
+git clone https://github.com/CognitiveVR/cognitive3dpy.git
+cd cognitive3dpy
+uv sync --all-extras  # installs package + dev + pandas dependencies
+uv run pytest tests/  # run tests
+```
+
+Releases are automated via [python-semantic-release](https://python-semantic-release.readthedocs.io/) on push to `main`. Use [conventional commits](https://www.conventionalcommits.org/) (`fix:`, `feat:`, `feat!:`) to trigger a release.

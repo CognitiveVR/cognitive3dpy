@@ -24,6 +24,14 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check src/ tests/
 
+      - name: Checkout slicer fields
+        uses: actions/checkout@v4
+        with:
+          repository: CognitiveVR/cvr-slicer
+          path: ../cvr-slicer
+          sparse-checkout: doc/slicer_fields.yaml
+        continue-on-error: true
+
       - name: Validate schema freshness
         run: |
           if [ -f "../cvr-slicer/doc/slicer_fields.yaml" ] || [ -f "../cvr-cortex/doc/slicer_fields.yaml" ]; then
