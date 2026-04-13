@@ -20,8 +20,11 @@ pandas = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.10.6,<0.11.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "pyyaml"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.custom]
+path = "build_hooks.py"
 
 [dependency-groups]
 dev = [
@@ -31,6 +34,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "python-semantic-release>=9.0.0",
     "respx>=0.22.0",
+    "pyyaml>=6.0",
     "ruff>=0.15.2",
 ]
 
