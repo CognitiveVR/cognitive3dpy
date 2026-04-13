@@ -10,6 +10,7 @@ import polars as pl
 
 from cognitive3dpy._client import c3d_get, c3d_request
 from cognitive3dpy._filters import build_filters
+from cognitive3dpy._schema import empty_frame
 from cognitive3dpy._transform import to_output, warn_if_empty
 from cognitive3dpy.auth import get_project_id
 
@@ -80,8 +81,8 @@ def c3d_exitpoll(
     raw_all = c3d_get(f"/v0/questionSets?projectIds={project_id}")
     if not raw_all:
         if warn_empty:
-            warn_if_empty(pl.DataFrame(), "c3d_exitpoll")
-        return to_output(pl.DataFrame(), output)
+            warn_if_empty(empty_frame("exitpoll"), "c3d_exitpoll")
+        return to_output(empty_frame("exitpoll"), output)
 
     versions_meta = _parse_hook_metadata(raw_all)
 
@@ -93,8 +94,8 @@ def c3d_exitpoll(
 
     if not versions_meta:
         if warn_empty:
-            warn_if_empty(pl.DataFrame(), "c3d_exitpoll")
-        return to_output(pl.DataFrame(), output)
+            warn_if_empty(empty_frame("exitpoll"), "c3d_exitpoll")
+        return to_output(empty_frame("exitpoll"), output)
 
     # Build session filters.
     filters = build_filters(
@@ -121,8 +122,8 @@ def c3d_exitpoll(
 
     if not all_dfs:
         if warn_empty:
-            warn_if_empty(pl.DataFrame(), "c3d_exitpoll")
-        return to_output(pl.DataFrame(), output)
+            warn_if_empty(empty_frame("exitpoll"), "c3d_exitpoll")
+        return to_output(empty_frame("exitpoll"), output)
 
     return to_output(pl.concat(all_dfs, how="diagonal"), output)
 

@@ -153,7 +153,7 @@ def test_duration_conversion():
 def test_step_timestamp_is_datetime():
     _mock_base(respx)
     df = c3d_session_objectives(start_date="2025-01-01", end_date="2026-01-01")
-    assert df.schema["step_timestamp"] == pl.Datetime("ms", "UTC")
+    assert df.schema["step_timestamp"] == pl.Datetime("us", "UTC")
 
 
 @respx.mock
@@ -495,8 +495,8 @@ def test_step_description_empty_when_no_match():
 
 @respx.mock
 def test_numeric_step_timestamp_converted_to_datetime():
-    """Integer epoch-ms step_timestamp is converted to Datetime(ms, UTC)."""
+    """Integer epoch-ms step_timestamp is converted to Datetime(us, UTC)."""
     _mock_base(respx)
     df = c3d_session_objectives(start_date="2025-01-01", end_date="2026-01-01")
     # sessions_with_objectives.json uses integer timestamps
-    assert df.schema["step_timestamp"] == pl.Datetime("ms", "UTC")
+    assert df.schema["step_timestamp"] == pl.Datetime("us", "UTC")

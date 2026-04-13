@@ -12,7 +12,8 @@ import polars as pl
 from cognitive3dpy._filters import build_filters
 from cognitive3dpy._lookups import fetch_objectives_metadata, fetch_scenes_metadata
 from cognitive3dpy._pagination import paginate_sessions
-from cognitive3dpy._transform import to_output, warn_if_empty
+from cognitive3dpy._schema import empty_frame
+from cognitive3dpy._transform import coerce_types, to_output, warn_if_empty
 from cognitive3dpy.auth import get_project_id
 
 logger = logging.getLogger(__name__)
@@ -199,36 +200,11 @@ def c3d_session_objectives(
 
     if not all_rows:
         if warn_empty:
-            warn_if_empty(pl.DataFrame(), "c3d_session_objectives")
-        return to_output(pl.DataFrame(), output)
+            warn_if_empty(empty_frame("objective"), "c3d_session_objectives")
+        return to_output(empty_frame("objective"), output)
 
     df = pl.DataFrame(all_rows)
-
-    # Convert step_timestamp to datetime (may be epoch-ms or ISO string)
-    if "step_timestamp" in df.columns:
-        dtype = df.schema["step_timestamp"]
-        if dtype == pl.Utf8:
-            df = df.with_columns(
-                pl.col("step_timestamp")
-                .str.to_datetime(time_zone="UTC", time_unit="us")
-                .alias("step_timestamp")
-            )
-        elif dtype in (pl.Int64, pl.Float64):
-            df = df.with_columns(
-                pl.col("step_timestamp")
-                .cast(pl.Int64)
-                .cast(pl.Datetime("ms"))
-                .dt.replace_time_zone("UTC")
-                .alias("step_timestamp")
-            )
-
-    # Convert session_date string to datetime
-    if "session_date" in df.columns and df.schema["session_date"] == pl.Utf8:
-        df = df.with_columns(
-            pl.col("session_date")
-            .str.to_datetime(time_zone="UTC", time_unit="us")
-            .alias("session_date")
-        )
+    df = coerce_types(df)
 
     return to_output(df, output)
 

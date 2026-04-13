@@ -10,6 +10,12 @@ import polars as pl
 from cognitive3dpy._filters import build_filters
 from cognitive3dpy._lookups import fetch_scenes_metadata
 from cognitive3dpy._pagination import paginate_sessions
+from cognitive3dpy._schema import (
+    SESSION_PROPERTY_OVERRIDES,
+    SESSION_RAW_OVERRIDES,
+    empty_frame,
+    fetch_property_types,
+)
 from cognitive3dpy._transform import (
     coerce_types,
     join_scene_names,
@@ -118,8 +124,8 @@ def c3d_sessions(
         )
         if not results:
             if warn_empty:
-                warn_if_empty(pl.DataFrame(), "c3d_sessions")
-            return to_output(pl.DataFrame(), output)
+                warn_if_empty(empty_frame("session"), "c3d_sessions")
+            return to_output(empty_frame("session"), output)
         lookup: dict[str, str] = {}
 
     elif session_type == "scene":
@@ -132,24 +138,20 @@ def c3d_sessions(
         )
         if not results:
             if warn_empty:
-                warn_if_empty(pl.DataFrame(), "c3d_sessions")
-            return to_output(pl.DataFrame(), output)
+                warn_if_empty(empty_frame("session"), "c3d_sessions")
+            return to_output(empty_frame("session"), output)
 
     else:
         raise ValueError(
             f"session_type must be 'project' or 'scene', got {session_type!r}"
         )
 
-    # Drop the legacy top-level "hmd" field before DataFrame construction.
-    # This field has inconsistent types across projects (null/int/string)
-    # which causes Polars schema inference failures. The same data is
-    # available reliably via the properties struct as c3d_device_hmd_type.
-    for r in results:
-        r.pop("hmd", None)
-
-    df = pl.DataFrame(results)
+    df = pl.DataFrame(results, schema_overrides=SESSION_RAW_OVERRIDES)
     df = normalize_columns(df)
-    df = coerce_types(df)
+
+    # Merge YAML-generated property types with runtime types from the API
+    overrides = {**SESSION_PROPERTY_OVERRIDES, **fetch_property_types(project_id)}
+    df = coerce_types(df, property_overrides=overrides)
 
     # Duplicate c3d_device_hmd_type under the legacy "hmd" name so
     # downstream consumers (Fabric notebook, semantic model) that
