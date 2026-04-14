@@ -50,8 +50,14 @@ SESSION_RAW_OVERRIDES: dict[str, pl.DataType] = {
 # Keys are normalized (snake_case) since they've been through _clean_name().
 # ============================================================================
 
+_SESSION_PROPERTY_SUPPLEMENTS: dict[str, pl.DataType] = {
+    # Properties not in the YAML but known to need explicit types.
+    "c3d.roomsize.meters": pl.Float64,
+}
+
 SESSION_PROPERTY_OVERRIDES: dict[str, pl.DataType] = {
-    _clean_name(k): v for k, v in SESSION_PROPERTY_TYPES.items()
+    _clean_name(k): v
+    for k, v in {**SESSION_PROPERTY_TYPES, **_SESSION_PROPERTY_SUPPLEMENTS}.items()
 }
 
 # ============================================================================
@@ -132,8 +138,6 @@ EXITPOLL_SCHEMA: dict[str, pl.DataType] = {
 # ============================================================================
 # Helpers
 # ============================================================================
-
-FLOAT64_PREFIXES: tuple[str, ...] = ("c3d_metrics_", "c3d_metric_components_")
 
 _DOMAIN_SCHEMAS: dict[str, dict[str, pl.DataType]] = {
     "session": SESSION_SCHEMA,
