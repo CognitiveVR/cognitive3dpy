@@ -18,8 +18,6 @@ import logging
 import polars as pl
 
 from cognitive3dpy._schema_generated import (
-    EVENT_FIELD_TYPES,
-    EVENT_PROPERTY_TYPES,
     SESSION_FIELD_TYPES,
     SESSION_PROPERTY_TYPES,
 )
@@ -65,10 +63,7 @@ SESSION_PROPERTY_OVERRIDES: dict[str, pl.DataType] = {
 # Merged field + property types with normalized names.
 # ============================================================================
 
-# Build normalized versions of the field types
 _session_fields_normalized = {_clean_name(k): v for k, v in SESSION_FIELD_TYPES.items()}
-_event_fields_normalized = {_clean_name(k): v for k, v in EVENT_FIELD_TYPES.items()}
-_event_props_normalized = {_clean_name(k): v for k, v in EVENT_PROPERTY_TYPES.items()}
 
 SESSION_SCHEMA: dict[str, pl.DataType] = {
     **_session_fields_normalized,

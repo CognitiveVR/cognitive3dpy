@@ -122,10 +122,6 @@ def c3d_sessions(
             session_filters=filters,
             max_sessions=n,
         )
-        if not results:
-            if warn_empty:
-                warn_if_empty(empty_frame("session"), "c3d_sessions")
-            return to_output(empty_frame("session"), output)
         lookup: dict[str, str] = {}
 
     elif session_type == "scene":
@@ -136,15 +132,16 @@ def c3d_sessions(
             scene_id,
             scene_version_id,
         )
-        if not results:
-            if warn_empty:
-                warn_if_empty(empty_frame("session"), "c3d_sessions")
-            return to_output(empty_frame("session"), output)
 
     else:
         raise ValueError(
             f"session_type must be 'project' or 'scene', got {session_type!r}"
         )
+
+    if not results:
+        if warn_empty:
+            warn_if_empty(empty_frame("session"), "c3d_sessions")
+        return to_output(empty_frame("session"), output)
 
     df = pl.DataFrame(results, schema_overrides=SESSION_RAW_OVERRIDES)
     df = normalize_columns(df)
