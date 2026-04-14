@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import sys
 import textwrap
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -153,7 +153,7 @@ def generate(yaml_path: Path) -> str:
     event_fields = parse_fields(data.get("event_fields", {}))
     event_properties = parse_properties(data.get("event_properties", {}))
 
-    yaml_mtime = datetime.fromtimestamp(yaml_path.stat().st_mtime, tz=datetime.UTC)
+    yaml_mtime = datetime.fromtimestamp(yaml_path.stat().st_mtime, tz=UTC)
     timestamp = yaml_mtime.strftime("%Y-%m-%dT%H:%M:%SZ")
     yaml_name = yaml_path.name
 
