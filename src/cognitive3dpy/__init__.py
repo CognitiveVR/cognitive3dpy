@@ -17,6 +17,7 @@ from cognitive3dpy.exitpoll import c3d_exitpoll
 from cognitive3dpy.objectives import c3d_objective_results
 from cognitive3dpy.session_objectives import c3d_session_objectives
 from cognitive3dpy.sessions import c3d_sessions
+from cognitive3dpy.utils import clear_cache
 
 __all__ = [
     # Auth
@@ -30,6 +31,8 @@ __all__ = [
     "c3d_exitpoll",
     # Config
     "c3d_set_timeout",
+    # Utilities
+    "clear_cache",
     # Exceptions
     "C3DError",
     "C3DAuthError",
