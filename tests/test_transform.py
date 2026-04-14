@@ -233,7 +233,9 @@ def test_normalize_columns_triple_duplicate_property_dropped(caplog):
             "fieldA": ["top_a"],
             "fieldB": ["top_b"],
             "fieldC": ["top_c"],
-            "properties": [{"fieldA": "prop_a", "fieldB": "prop_b", "fieldC": "prop_c"}],
+            "properties": [
+                {"fieldA": "prop_a", "fieldB": "prop_b", "fieldC": "prop_c"}
+            ],
         }
     )
     df = df.with_columns(
