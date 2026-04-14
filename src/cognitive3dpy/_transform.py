@@ -64,7 +64,6 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "session_date",
     "end_date",
     "duration_s",
-    "hmd",
     "user",
     "device_id",
     "participant_id",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Literal
 
@@ -150,11 +151,12 @@ def c3d_sessions(
     overrides = {**SESSION_PROPERTY_OVERRIDES, **fetch_property_types(project_id)}
     df = coerce_types(df, property_overrides=overrides)
 
-    # Duplicate c3d_device_hmd_type under the legacy "hmd" name so
-    # downstream consumers (Fabric notebook, semantic model) that
-    # reference "hmd" continue to work without schema changes.
-    if "c3d_device_hmd_type" in df.columns:
-        df = df.with_columns(pl.col("c3d_device_hmd_type").alias("hmd"))
+    if "hmd" in df.columns:
+        warnings.warn(
+            "The 'hmd' column is deprecated. Use 'c3d_device_hmd_type' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if lookup:
         df = join_scene_names(df, lookup)
