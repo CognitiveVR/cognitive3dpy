@@ -183,6 +183,13 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
                         "(already exists as a top-level column).",
                         d,
                     )
+                warnings.warn(
+                    f"normalize_columns() dropped {len(dupes)} duplicate "
+                    f"property field(s) that already exist as top-level "
+                    f"columns: {dupes!r}. Top-level values were kept.",
+                    UserWarning,
+                    stacklevel=2,
+                )
                 keep = [f for f in prop_fields if f not in existing_cols]
                 if keep:
                     exprs = [
@@ -219,6 +226,13 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
             clean_map[col] = clean
 
     if drop_cols:
+        warnings.warn(
+            f"normalize_columns() dropped {len(drop_cols)} column(s) "
+            f"whose cleaned names collide with existing columns: "
+            f"{drop_cols!r}. First occurrence was kept.",
+            UserWarning,
+            stacklevel=2,
+        )
         df = df.drop(drop_cols)
     if clean_map:
         df = df.rename(clean_map)
