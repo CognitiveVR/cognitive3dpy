@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Generated: 2026-04-13T22:25:36Z
+Generated: 2026-04-09T23:45:39Z
 Source: slicer_fields.yaml
 """
 
