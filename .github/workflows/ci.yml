@@ -26,3 +26,53 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ --cov=src/cognitive3dpy --cov-report=term-missing --cov-fail-under=50
+
+  schema-freshness:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout cvr-slicer
+        uses: actions/checkout@v4
+        with:
+          repository: CognitiveVR/cvr-slicer
+          token: ${{ secrets.SLICER_READ_TOKEN }}
+          path: cvr-slicer
+          sparse-checkout: doc/slicer_fields.yaml
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout cvr-cortex (fallback)
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: CognitiveVR/cvr-cortex
+          token: ${{ secrets.SLICER_READ_TOKEN }}
+          path: cvr-cortex
+          sparse-checkout: doc/slicer_fields.yaml
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Regenerate schema and check for drift
+        run: |
+          if [ -f cvr-slicer/doc/slicer_fields.yaml ]; then
+            YAML_PATH=cvr-slicer/doc/slicer_fields.yaml
+          elif [ -f cvr-cortex/doc/slicer_fields.yaml ]; then
+            YAML_PATH=cvr-cortex/doc/slicer_fields.yaml
+          else
+            echo "::warning::slicer_fields.yaml not found in either repo — skipping freshness check"
+            exit 0
+          fi
+
+          python scripts/sync_schema.py "$YAML_PATH"
+          if ! git diff --exit-code src/cognitive3dpy/_schema_generated.py; then
+            echo "::error::_schema_generated.py is out of date. Run: uv run python scripts/sync_schema.py"
+            exit 1
+          fi
+          echo "Schema is up to date."
