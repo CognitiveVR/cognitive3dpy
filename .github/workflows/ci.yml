@@ -71,7 +71,7 @@ jobs:
           fi
 
           python scripts/sync_schema.py "$YAML_PATH"
-          if ! git diff --exit-code src/cognitive3dpy/_schema_generated.py; then
+          if ! git diff --exit-code -I '^Generated:' src/cognitive3dpy/_schema_generated.py; then
             echo "::error::_schema_generated.py is out of date. Run: uv run python scripts/sync_schema.py"
             exit 1
           fi
