@@ -221,3 +221,87 @@ def test_to_output_invalid():
     df = pl.DataFrame({"a": [1]})
     with pytest.raises(ValueError, match="output must be"):
         to_output(df, "csv")
+
+
+# --- Duplicate column handling (DS-561) ---
+
+
+def test_normalize_columns_triple_duplicate_property_dropped(caplog):
+    """Three property fields that already exist as top-level columns."""
+    df = pl.DataFrame(
+        {
+            "fieldA": ["top_a"],
+            "fieldB": ["top_b"],
+            "fieldC": ["top_c"],
+            "properties": [{"fieldA": "prop_a", "fieldB": "prop_b", "fieldC": "prop_c"}],
+        }
+    )
+    df = df.with_columns(
+        pl.col("properties").cast(
+            pl.Struct({"fieldA": pl.Utf8, "fieldB": pl.Utf8, "fieldC": pl.Utf8})
+        )
+    )
+    with caplog.at_level(logging.WARNING, logger="cognitive3dpy._transform"):
+        result = normalize_columns(df)
+    assert result["field_a"][0] == "top_a"
+    assert result["field_b"][0] == "top_b"
+    assert result["field_c"][0] == "top_c"
+    assert "properties" not in result.columns
+    assert sum("Dropping duplicate property field" in m for m in caplog.messages) == 3
+
+
+def test_normalize_columns_realistic_project_4460_collision(caplog):
+    """Realistic scenario: c3d.participant.oculus_username (property) collides
+    with c3d_participant_oculus_username (top-level) after cleaning."""
+    df = pl.DataFrame(
+        {
+            "c3d_participant_oculus_username": ["top_level_value"],
+            "c3d.participant.oculus_username": ["dot_notation_value"],
+        }
+    )
+    with caplog.at_level(logging.WARNING, logger="cognitive3dpy._transform"):
+        result = normalize_columns(df)
+    # First occurrence (c3d_participant_oculus_username) kept
+    assert result.shape[1] == 1
+    assert "c3d_participant_oculus_username" in result.columns
+    assert result["c3d_participant_oculus_username"][0] == "top_level_value"
+    assert any("which already exists" in m for m in caplog.messages)
+
+
+def test_normalize_columns_dedup_with_compact():
+    """Dedup should not break compact column selection."""
+    df = pl.DataFrame(
+        {
+            "sessionId": ["s1"],
+            "c3d_participant_oculus_username": ["top_level"],
+            "c3d.participant.oculus_username": ["dot_notation"],
+            "properties": [{"c3d.app.name": "MyApp"}],
+        }
+    )
+    df = df.with_columns(
+        pl.col("properties").cast(pl.Struct({"c3d.app.name": pl.Utf8}))
+    )
+    result = normalize_columns(df)
+    compacted = select_compact(result)
+    # Should not raise — compact selection should work on deduped frame
+    assert "c3d_app_name" in compacted.columns
+    assert compacted.shape[0] == 1
+
+
+def test_normalize_columns_dedup_with_coerce_types_overrides():
+    """Property overrides should apply to the surviving column after dedup."""
+    df = pl.DataFrame(
+        {
+            "c3d.geo.latitude": [42],
+            "c3d_geo_latitude": [43],
+        }
+    )
+    result = normalize_columns(df)
+    # First column (c3d.geo.latitude) kept, cleaned to c3d_geo_latitude
+    assert result.shape[1] == 1
+    assert result["c3d_geo_latitude"][0] == 42
+
+    overrides = {"c3d_geo_latitude": pl.Float64}
+    result = coerce_types(result, property_overrides=overrides)
+    assert result.schema["c3d_geo_latitude"] == pl.Float64
+    assert result["c3d_geo_latitude"][0] == pytest.approx(42.0)

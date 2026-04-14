@@ -155,10 +155,11 @@ def _unnest_events(results: list[dict]) -> pl.DataFrame:
                 "scene_version_id": event.get("parentSceneVersionId"),
             }
 
+            base_keys = set(row.keys())
             seen: set[str] = set()
             for k, v in event.get("properties", {}).items():
                 clean_key = f"prop_{_clean_name(k)}"
-                if clean_key in row:
+                if clean_key in base_keys:
                     base_collisions.add(clean_key)
                     continue
                 if clean_key in seen:
