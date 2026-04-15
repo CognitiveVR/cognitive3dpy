@@ -2,6 +2,46 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-04-15)
+
+### Bug Fixes
+
+- Added deprecation warning for unused hmd property
+  ([`aa03451`](https://github.com/CognitiveVR/cognitive3dpy/commit/aa03451641ac5595988d0db1543e79daa1f861d9))
+
+- Added function for users to clear all cache or cache for a specific project
+  ([`bc3f0de`](https://github.com/CognitiveVR/cognitive3dpy/commit/bc3f0dee488a6e01bf0f2dc952482700596694d3))
+
+- Additional guardrails for collision handling when getting events
+  ([`8a2bcad`](https://github.com/CognitiveVR/cognitive3dpy/commit/8a2bcadde34e6a4fdcb51fd1ff0a427f6defd53d))
+
+- Checkout cvr-slicer inside workspace for CI schema validation
+  ([`27ac43b`](https://github.com/CognitiveVR/cognitive3dpy/commit/27ac43bed528dfcc68ae28db06c54c616a86c546))
+
+- Ignore timestamp line in schema freshness check
+  ([`de5ecd5`](https://github.com/CognitiveVR/cognitive3dpy/commit/de5ecd5bc4f3640491d00ea1847d021b161d0a15))
+
+- Import UTC correctly in sync_schema.py
+  ([`3fb5ad9`](https://github.com/CognitiveVR/cognitive3dpy/commit/3fb5ad96e67273b7af425490b94f711e3e7740d3))
+
+- Removed dead code and updated tests
+  ([`0a5c6ec`](https://github.com/CognitiveVR/cognitive3dpy/commit/0a5c6ece3dd4d5a5d0719480df305f6cdc93eab0))
+
+- Removed unused event schema generation code
+  ([`e50b3da`](https://github.com/CognitiveVR/cognitive3dpy/commit/e50b3da58c0d26295fe7a251fb754357e0bd1fa6))
+
+- Use content hash instead of timestamp for schema freshness check
+  ([`4e5689f`](https://github.com/CognitiveVR/cognitive3dpy/commit/4e5689f37f6dd0c753dc1bc39d2f545fab67fa8e))
+
+- Use YAML mtime for schema timestamp so CI freshness check is deterministic
+  ([`cc5a8d2`](https://github.com/CognitiveVR/cognitive3dpy/commit/cc5a8d2bb30bb521f0cb2713cc24e01e5e4d3d17))
+
+### Features
+
+- Added warning logging for deprecated fields/properties
+  ([`6834ac6`](https://github.com/CognitiveVR/cognitive3dpy/commit/6834ac60c927e124cac7fbad3397e862142a1982))
+
+
 ## v1.0.6 (2026-04-13)
 
 
