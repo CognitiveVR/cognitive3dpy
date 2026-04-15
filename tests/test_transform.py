@@ -8,6 +8,7 @@ import pytest
 from cognitive3dpy._transform import (
     _clean_name,
     coerce_types,
+    handle_deprecated_columns,
     join_scene_names,
     normalize_columns,
     select_compact,
@@ -307,3 +308,90 @@ def test_normalize_columns_dedup_with_coerce_types_overrides():
     result = coerce_types(result, property_overrides=overrides)
     assert result.schema["c3d_geo_latitude"] == pl.Float64
     assert result["c3d_geo_latitude"][0] == pytest.approx(42.0)
+
+
+# --- Deprecated / renamed columns (DS-583) ---
+
+
+def test_handle_deprecated_warns_with_replacement(recwarn):
+    df = pl.DataFrame({"c3d_metrics_app_performance": [0.8]})
+    result = handle_deprecated_columns(df)
+    # Column stays in the DataFrame
+    assert "c3d_metrics_app_performance" in result.columns
+    assert result["c3d_metrics_app_performance"][0] == 0.8
+    # Warning cites replacement
+    msgs = [str(w.message) for w in recwarn]
+    assert any(
+        "c3d_metrics_app_performance" in m and "c3d_metrics_fps_score" in m
+        for m in msgs
+    )
+
+
+def test_handle_deprecated_warns_without_replacement(recwarn):
+    df = pl.DataFrame({"c3d_metrics_boundary_score": [0.5]})
+    result = handle_deprecated_columns(df)
+    assert "c3d_metrics_boundary_score" in result.columns
+    msgs = [str(w.message) for w in recwarn]
+    assert any(
+        "c3d_metrics_boundary_score" in m and "removed in a future" in m
+        for m in msgs
+    )
+
+
+def test_handle_deprecated_hmd(recwarn):
+    df = pl.DataFrame({"hmd": ["Quest 3"]})
+    result = handle_deprecated_columns(df)
+    assert "hmd" in result.columns
+    msgs = [str(w.message) for w in recwarn]
+    assert any("hmd" in m and "c3d_device_hmd_type" in m for m in msgs)
+
+
+def test_handle_renamed_old_only(recwarn):
+    """Old column exists, new doesn't — should be renamed."""
+    df = pl.DataFrame({
+        "c3d_metrics_head_orientation_score": [0.9],
+    })
+    result = handle_deprecated_columns(df)
+    assert "c3d_metrics_head_orientation_score" not in result.columns
+    new_col = "c3d_metric_components_comfort_score_head_orientation_score"
+    assert new_col in result.columns
+    assert result[new_col][0] == 0.9
+    msgs = [str(w.message) for w in recwarn]
+    assert any("renamed" in m.lower() for m in msgs)
+
+
+def test_handle_renamed_both_exist(recwarn):
+    """Both old and new exist — keep new, drop old."""
+    old = "c3d_metrics_head_orientation_score"
+    new = "c3d_metric_components_comfort_score_head_orientation_score"
+    df = pl.DataFrame({old: [0.7], new: [0.9]})
+    result = handle_deprecated_columns(df)
+    assert old not in result.columns
+    assert new in result.columns
+    assert result[new][0] == 0.9
+
+
+def test_handle_renamed_new_only_no_warning(recwarn):
+    """Only new column exists — no warning, no changes."""
+    new = "c3d_metric_components_comfort_score_head_orientation_score"
+    df = pl.DataFrame({new: [0.9]})
+    result = handle_deprecated_columns(df)
+    assert new in result.columns
+    deprecation_warnings = [
+        w for w in recwarn if issubclass(w.category, DeprecationWarning)
+    ]
+    assert len(deprecation_warnings) == 0
+
+
+def test_handle_no_deprecated_columns_no_warning(recwarn):
+    """DataFrame with only active columns — no warnings."""
+    df = pl.DataFrame({
+        "c3d_metrics_fps_score": [0.9],
+        "c3d_metrics_presence_score": [0.8],
+    })
+    result = handle_deprecated_columns(df)
+    assert result.shape == df.shape
+    deprecation_warnings = [
+        w for w in recwarn if issubclass(w.category, DeprecationWarning)
+    ]
+    assert len(deprecation_warnings) == 0

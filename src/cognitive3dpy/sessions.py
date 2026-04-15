@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Literal
 
@@ -19,6 +18,7 @@ from cognitive3dpy._schema import (
 )
 from cognitive3dpy._transform import (
     coerce_types,
+    handle_deprecated_columns,
     join_scene_names,
     normalize_columns,
     select_compact,
@@ -146,17 +146,11 @@ def c3d_sessions(
 
     df = pl.DataFrame(results, schema_overrides=SESSION_RAW_OVERRIDES)
     df = normalize_columns(df)
+    df = handle_deprecated_columns(df)
 
     # Merge YAML-generated property types with runtime types from the API
     overrides = {**SESSION_PROPERTY_OVERRIDES, **fetch_property_types(project_id)}
     df = coerce_types(df, property_overrides=overrides)
-
-    if "hmd" in df.columns:
-        warnings.warn(
-            "The 'hmd' column is deprecated. Use 'c3d_device_hmd_type' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     if lookup:
         df = join_scene_names(df, lookup)

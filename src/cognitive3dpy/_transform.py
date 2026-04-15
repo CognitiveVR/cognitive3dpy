@@ -94,18 +94,10 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "c3d_roomsize_meters",
     # Key metrics (top-level scores)
     "c3d_metrics_fps_score",
-    "c3d_metrics_app_performance",
     "c3d_metrics_average_fps",
     "c3d_metrics_presence_score",
-    "c3d_metrics_immersion_score",
-    "c3d_metrics_orientation_score",
     "c3d_metrics_comfort_score",
-    "c3d_metrics_ergonomics_score",
     "c3d_metrics_battery_efficiency",
-    "c3d_metrics_boundary_score",
-    "c3d_metrics_controller_events_score",
-    "c3d_metrics_controller_engagement_score",
-    "c3d_metrics_dynamic_engagement_score",
     "c3d_metrics_standing_percentage",
     "c3d_metrics_cyberwellness_score",
     # Metric components (sub-scores)
@@ -234,6 +226,60 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
         df = df.drop(drop_cols)
     if clean_map:
         df = df.rename(clean_map)
+
+    return df
+
+
+def handle_deprecated_columns(df: pl.DataFrame) -> pl.DataFrame:
+    """Warn on deprecated columns and rename legacy columns to current names.
+
+    - **Deprecated columns** remain in the DataFrame but trigger a
+      ``DeprecationWarning`` citing the replacement (if any).
+    - **Renamed columns** are mapped to their current name. If only the
+      old name exists it is renamed; if both exist the new name takes
+      precedence and the old column is dropped.
+    """
+    from cognitive3dpy._schema import DEPRECATED_COLUMNS, RENAMED_COLUMNS
+
+    cols = set(df.columns)
+
+    # Warn on deprecated columns.
+    for old, replacement in DEPRECATED_COLUMNS.items():
+        if old in cols:
+            if replacement:
+                msg = (
+                    f"Column '{old}' is deprecated. "
+                    f"Use '{replacement}' instead."
+                )
+            else:
+                msg = (
+                    f"Column '{old}' is deprecated "
+                    f"and will be removed in a future release."
+                )
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+    # Handle renamed columns.
+    rename_map: dict[str, str] = {}
+    drop_cols: list[str] = []
+    for old, new in RENAMED_COLUMNS.items():
+        if old not in cols:
+            continue
+        warnings.warn(
+            f"Column '{old}' has been renamed to '{new}'.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if new in cols:
+            # Both exist — keep new, drop old.
+            drop_cols.append(old)
+        else:
+            # Only old exists — rename it.
+            rename_map[old] = new
+
+    if drop_cols:
+        df = df.drop(drop_cols)
+    if rename_map:
+        df = df.rename(rename_map)
 
     return df
 

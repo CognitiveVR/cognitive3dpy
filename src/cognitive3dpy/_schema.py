@@ -59,6 +59,59 @@ SESSION_PROPERTY_OVERRIDES: dict[str, pl.DataType] = {
 }
 
 # ============================================================================
+# Layer 1c — Deprecated and renamed properties
+# Used by handle_deprecated_columns() in _transform.py after normalization.
+# Keys and values are raw API property names (_clean_name applied at runtime).
+# ============================================================================
+
+# Deprecated properties: old_name → replacement (or None if no replacement)
+DEPRECATED_PROPERTIES: dict[str, str | None] = {
+    "c3d.metrics.app_performance": "c3d.metrics.fps_score",
+    "c3d.metrics.immersion_score": "c3d.metrics.presence_score",
+    "c3d.metrics.orientation_score":
+        "c3d.metric_components.comfort_score.head_orientation_score",
+    "c3d.metrics.ergonomics_score":
+        "c3d.metric_components.comfort_score.controller_ergonomic_score",
+    "c3d.metrics.boundary_score": None,
+    "c3d.metrics.controller_events_score": None,
+    "c3d.metrics.controller_engagement_score": None,
+    "c3d.metrics.dynamic_engagement_score": None,
+}
+
+# Renamed properties: old_name → new_name (same data, new path)
+RENAMED_PROPERTIES: dict[str, str] = {
+    "c3d.metrics.head_orientation_score":
+        "c3d.metric_components.comfort_score.head_orientation_score",
+    "c3d.metrics.spatial_coverage_score":
+        "c3d.metric_components.presence_score.spatial_coverage_score",
+    "c3d.metrics.controller_ergonomic_score":
+        "c3d.metric_components.comfort_score.controller_ergonomic_score",
+    "c3d.metric_components.pitch_score":
+        "c3d.metric_components.comfort_score.head_orientation_score_pitch_score",
+    "c3d.metric_components.roll_score":
+        "c3d.metric_components.comfort_score.head_orientation_score_roll_score",
+    "c3d.metric_components.forward_reach_score":
+        "c3d.metric_components.comfort_score.controller_ergonomic_score_forward_reach_score",
+    "c3d.metric_components.horizontal_reach_score":
+        "c3d.metric_components.comfort_score.controller_ergonomic_score_horizontal_reach_score",
+    "c3d.metric_components.vertical_reach_score":
+        "c3d.metric_components.comfort_score.controller_ergonomic_score_vertical_reach_score",
+}
+
+# Pre-computed normalized versions for use in _transform.py
+DEPRECATED_COLUMNS: dict[str, str | None] = {
+    _clean_name(k): _clean_name(v) if v else None
+    for k, v in DEPRECATED_PROPERTIES.items()
+}
+# Top-level fields that are already normalized (not c3d.* properties)
+DEPRECATED_COLUMNS["hmd"] = "c3d_device_hmd_type"
+
+RENAMED_COLUMNS: dict[str, str] = {
+    _clean_name(k): _clean_name(v)
+    for k, v in RENAMED_PROPERTIES.items()
+}
+
+# ============================================================================
 # Layer 2 — Post-normalization schemas (for empty_frame)
 # Merged field + property types with normalized names.
 # ============================================================================
