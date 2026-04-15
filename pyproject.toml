@@ -1,6 +1,6 @@
 [project]
 name = "cognitive3dpy"
-version = "1.1.0"
+version = "1.2.0"
 description = "Python client for the Cognitive3D analytics API."
 readme = "README.md"
 authors = [

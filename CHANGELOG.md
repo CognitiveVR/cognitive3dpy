@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-04-15)
+
+### Features
+
+- Add data-availability flags to compact columns
+  ([`f0299b3`](https://github.com/CognitiveVR/cognitive3dpy/commit/f0299b3e50361c2cb032b0c650c18906a32ad311))
+
+
 ## v1.1.0 (2026-04-15)
 
 ### Bug Fixes
