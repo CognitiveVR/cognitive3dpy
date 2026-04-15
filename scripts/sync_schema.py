@@ -12,10 +12,10 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import textwrap
-from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -153,8 +153,8 @@ def generate(yaml_path: Path) -> str:
     event_fields = parse_fields(data.get("event_fields", {}))
     event_properties = parse_properties(data.get("event_properties", {}))
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     yaml_name = yaml_path.name
+    yaml_hash = hashlib.sha256(yaml_path.read_bytes()).hexdigest()[:12]
 
     header = textwrap.dedent(f"""\
         \"\"\"Auto-generated Polars type mappings from {yaml_name}.
@@ -162,8 +162,7 @@ def generate(yaml_path: Path) -> str:
         DO NOT EDIT MANUALLY. Regenerate with:
             uv run python scripts/sync_schema.py
 
-        Generated: {timestamp}
-        Source: {yaml_name}
+        Source: {yaml_name} (sha256:{yaml_hash})
         \"\"\"
 
         from __future__ import annotations

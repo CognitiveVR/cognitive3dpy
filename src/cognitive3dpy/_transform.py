@@ -15,6 +15,44 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
+_CAMEL_RE = re.compile(r"([a-z])([A-Z])")
+_MULTI_UNDERSCORE_RE = re.compile(r"_+")
+
+
+def _clean_name(name: str) -> str:
+    """Convert a column or property key to a clean snake_case name.
+
+    Transformations applied in order:
+    1. Delete apostrophes and quotes.
+    2. Replace ``%`` with ``percent`` and ``#`` with ``number``.
+    3. Replace dots, spaces, and hyphens with underscores.
+    4. camelCase → snake_case.
+    5. Lowercase.
+    6. Collapse consecutive underscores to one.
+
+    Examples
+    --------
+    >>> _clean_name("endDate")
+    'end_date'
+    >>> _clean_name("hasDynamic")
+    'has_dynamic'
+    >>> _clean_name("c3d.app.name")
+    'c3d_app_name'
+    >>> _clean_name("c3d.metric_components.comfort_score.head_orientation_score")
+    'c3d_metric_components_comfort_score_head_orientation_score'
+    >>> _clean_name("Angle from HMD")
+    'angle_from_hmd'
+    >>> _clean_name("success%")
+    'success_percent'
+    >>> _clean_name("my-custom-prop")
+    'my_custom_prop'
+    """
+    name = name.replace("'", "").replace('"', "")
+    name = name.replace("%", "_percent").replace("#", "_number")
+    name = name.replace(".", "_").replace(" ", "_").replace("-", "_")
+    name = _CAMEL_RE.sub(r"\1_\2", name).lower()
+    return _MULTI_UNDERSCORE_RE.sub("_", name)
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -26,7 +64,6 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "session_date",
     "end_date",
     "duration_s",
-    "hmd",
     "user",
     "device_id",
     "participant_id",
@@ -57,18 +94,10 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "c3d_roomsize_meters",
     # Key metrics (top-level scores)
     "c3d_metrics_fps_score",
-    "c3d_metrics_app_performance",
     "c3d_metrics_average_fps",
     "c3d_metrics_presence_score",
-    "c3d_metrics_immersion_score",
-    "c3d_metrics_orientation_score",
     "c3d_metrics_comfort_score",
-    "c3d_metrics_ergonomics_score",
     "c3d_metrics_battery_efficiency",
-    "c3d_metrics_boundary_score",
-    "c3d_metrics_controller_events_score",
-    "c3d_metrics_controller_engagement_score",
-    "c3d_metrics_dynamic_engagement_score",
     "c3d_metrics_standing_percentage",
     "c3d_metrics_cyberwellness_score",
     # Metric components (sub-scores)
@@ -115,45 +144,6 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
 ]
 
 
-_CAMEL_RE = re.compile(r"([a-z])([A-Z])")
-_MULTI_UNDERSCORE_RE = re.compile(r"_+")
-
-
-def _clean_name(name: str) -> str:
-    """Convert a column or property key to a clean snake_case name.
-
-    Transformations applied in order:
-    1. Delete apostrophes and quotes.
-    2. Replace ``%`` with ``percent`` and ``#`` with ``number``.
-    3. Replace dots, spaces, and hyphens with underscores.
-    4. camelCase → snake_case.
-    5. Lowercase.
-    6. Collapse consecutive underscores to one.
-
-    Examples
-    --------
-    >>> _clean_name("endDate")
-    'end_date'
-    >>> _clean_name("hasDynamic")
-    'has_dynamic'
-    >>> _clean_name("c3d.app.name")
-    'c3d_app_name'
-    >>> _clean_name("c3d.metric_components.comfort_score.head_orientation_score")
-    'c3d_metric_components_comfort_score_head_orientation_score'
-    >>> _clean_name("Angle from HMD")
-    'angle_from_hmd'
-    >>> _clean_name("success%")
-    'success_percent'
-    >>> _clean_name("my-custom-prop")
-    'my_custom_prop'
-    """
-    name = name.replace("'", "").replace('"', "")
-    name = name.replace("%", "_percent").replace("#", "_number")
-    name = name.replace(".", "_").replace(" ", "_").replace("-", "_")
-    name = _CAMEL_RE.sub(r"\1_\2", name).lower()
-    return _MULTI_UNDERSCORE_RE.sub("_", name)
-
-
 # Explicit renames for columns where _clean_name alone isn't enough.
 _COLUMN_RENAMES: dict[str, str] = {
     "date": "session_date",  # semantic rename
@@ -183,6 +173,13 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
                         "(already exists as a top-level column).",
                         d,
                     )
+                warnings.warn(
+                    f"normalize_columns() dropped {len(dupes)} duplicate "
+                    f"property field(s) that already exist as top-level "
+                    f"columns: {dupes!r}. Top-level values were kept.",
+                    UserWarning,
+                    stacklevel=2,
+                )
                 keep = [f for f in prop_fields if f not in existing_cols]
                 if keep:
                     exprs = [
@@ -219,6 +216,13 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
             clean_map[col] = clean
 
     if drop_cols:
+        warnings.warn(
+            f"normalize_columns() dropped {len(drop_cols)} column(s) "
+            f"whose cleaned names collide with existing columns: "
+            f"{drop_cols!r}. First occurrence was kept.",
+            UserWarning,
+            stacklevel=2,
+        )
         df = df.drop(drop_cols)
     if clean_map:
         df = df.rename(clean_map)
@@ -226,13 +230,61 @@ def normalize_columns(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
+def handle_deprecated_columns(df: pl.DataFrame) -> pl.DataFrame:
+    """Warn on deprecated columns and rename legacy columns to current names.
+
+    - **Deprecated columns** remain in the DataFrame but trigger a
+      ``DeprecationWarning`` citing the replacement (if any).
+    - **Renamed columns** are mapped to their current name. If only the
+      old name exists it is renamed; if both exist the new name takes
+      precedence and the old column is dropped.
+    """
+    from cognitive3dpy._schema import DEPRECATED_COLUMNS, RENAMED_COLUMNS
+
+    cols = set(df.columns)
+
+    # Warn on deprecated columns.
+    for old, replacement in DEPRECATED_COLUMNS.items():
+        if old in cols:
+            if replacement:
+                msg = (
+                    f"Column '{old}' is deprecated. "
+                    f"Use '{replacement}' instead."
+                )
+            else:
+                msg = (
+                    f"Column '{old}' is deprecated "
+                    f"and will be removed in a future release."
+                )
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+
+    # Handle renamed columns.
+    rename_map: dict[str, str] = {}
+    drop_cols: list[str] = []
+    for old, new in RENAMED_COLUMNS.items():
+        if old not in cols:
+            continue
+        warnings.warn(
+            f"Column '{old}' has been renamed to '{new}'.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if new in cols:
+            # Both exist — keep new, drop old.
+            drop_cols.append(old)
+        else:
+            # Only old exists — rename it.
+            rename_map[old] = new
+
+    if drop_cols:
+        df = df.drop(drop_cols)
+    if rename_map:
+        df = df.rename(rename_map)
+
+    return df
+
+
 _DATE_COLUMNS = ("session_date", "end_date", "event_date")
-_FLOAT_PREFIXES = ("c3d_metrics_", "c3d_metric_components_")
-_NUMERIC_DTYPES = (
-    pl.Int8, pl.Int16, pl.Int32, pl.Int64,
-    pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64,
-    pl.Float32, pl.Float64,
-)
 _MIN_YEAR = 2015  # Cognitive3D launch
 _MAX_FUTURE_DAYS = 365
 
@@ -302,18 +354,7 @@ def coerce_types(
     if "tags" in cols and df.schema["tags"] == pl.List(pl.Utf8):
         df = df.with_columns(pl.col("tags").list.join(", ").alias("tags"))
 
-    # 6. Cast numeric metric columns to Float64 (safety net for dynamic columns
-    #    not in the property registry)
-    float_casts = [
-        pl.col(col).cast(pl.Float64)
-        for col in df.columns
-        if (col.startswith(_FLOAT_PREFIXES) or col == "c3d_roomsize_meters")
-        and isinstance(df.schema[col], _NUMERIC_DTYPES)
-    ]
-    if float_casts:
-        df = df.with_columns(float_casts)
-
-    # 7. Cast Null-typed columns to String
+    # 6. Cast Null-typed columns to String
     null_cols = [name for name, dtype in df.schema.items() if dtype == pl.Null]
     if null_cols:
         df = df.with_columns([pl.col(c).cast(pl.Utf8) for c in null_cols])
@@ -402,29 +443,6 @@ def select_compact(df: pl.DataFrame) -> pl.DataFrame:
     existing = set(df.columns)
     selected = [c for c in SESSIONS_COMPACT_COLUMNS if c in existing]
     return df.select(selected)
-
-
-def prefix_event_props(
-    df: pl.DataFrame,
-    standard_columns: set[str],
-) -> pl.DataFrame:
-    """Prefix non-standard columns with ``prop_`` and replace spaces with underscores.
-
-    Parameters
-    ----------
-    standard_columns : set[str]
-        Column names that should *not* be prefixed.
-    """
-    rename_map: dict[str, str] = {}
-    for col in df.columns:
-        if col not in standard_columns:
-            clean = col.replace(" ", "_")
-            rename_map[col] = f"prop_{clean}"
-
-    if rename_map:
-        df = df.rename(rename_map)
-
-    return df
 
 
 def join_scene_names(

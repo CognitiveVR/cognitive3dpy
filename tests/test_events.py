@@ -8,7 +8,7 @@ import respx
 from helpers import load_fixture
 
 from cognitive3dpy._client import BASE_URL
-from cognitive3dpy.events import c3d_events
+from cognitive3dpy.events import _unnest_events, c3d_events
 
 SESSIONS_URL = f"{BASE_URL}/v0/datasets/sessions/paginatedListQueries"
 OBJECTS_URL = f"{BASE_URL}/v0/projects/1234/objects"
@@ -191,3 +191,65 @@ def test_events_no_stdout_output(capsys):
     )
     c3d_events(start_date="2025-01-01", end_date="2026-01-01")
     assert capsys.readouterr().out == ""
+
+
+# --- Event property collision detection (DS-561) ---
+
+
+def _make_session(events):
+    """Build a minimal session dict with the given events list."""
+    return {
+        "projectId": 1234,
+        "sessionId": "sess-1",
+        "participantId": "p1",
+        "userKey": "uk1",
+        "deviceId": "dev1",
+        "date": "2025-06-01T10:00:00Z",
+        "duration": 60000,
+        "events": events,
+    }
+
+
+def test_unnest_events_prop_collision_keeps_first(recwarn):
+    """Two property keys that clean to the same prop_* name."""
+    event = {
+        "name": "test_event",
+        "date": "2025-06-01T10:00:00Z",
+        "properties": {"my.prop": "first", "my_prop": "second"},
+    }
+    df = _unnest_events([_make_session([event])])
+    assert "prop_my_prop" in df.columns
+    assert df["prop_my_prop"][0] == "first"
+    assert any("collide with another property" in str(w.message) for w in recwarn)
+
+
+def test_unnest_events_prop_collision_does_not_overwrite_base(recwarn):
+    """Even without the prop_ prefix making base collisions impossible,
+    verify that properties never overwrite standard event fields."""
+    event = {
+        "name": "test_event",
+        "date": "2025-06-01T10:00:00Z",
+        "properties": {"intensity": 0.8},
+    }
+    df = _unnest_events([_make_session([event])])
+    # Standard fields remain intact
+    assert df["session_id"][0] == "sess-1"
+    assert df["event_name"][0] == "test_event"
+    # Property is prefixed and separate
+    assert df["prop_intensity"][0] == 0.8
+
+
+def test_unnest_events_no_collision_no_warning(recwarn):
+    """Normal properties should produce no warnings."""
+    event = {
+        "name": "test_event",
+        "date": "2025-06-01T10:00:00Z",
+        "properties": {"intensity": 0.8, "color": "red"},
+    }
+    df = _unnest_events([_make_session([event])])
+    assert "prop_intensity" in df.columns
+    assert "prop_color" in df.columns
+    collision_warnings = [
+        w for w in recwarn if "collide" in str(w.message)
+    ]
+    assert len(collision_warnings) == 0

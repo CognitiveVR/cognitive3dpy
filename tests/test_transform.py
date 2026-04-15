@@ -8,6 +8,7 @@ import pytest
 from cognitive3dpy._transform import (
     _clean_name,
     coerce_types,
+    handle_deprecated_columns,
     join_scene_names,
     normalize_columns,
     select_compact,
@@ -98,41 +99,6 @@ def test_coerce_types_tags_list_to_string():
     assert result["tags"][0] == "a, b"
 
 
-def test_coerce_types_metric_int_cast_to_float64():
-    # API may return whole-number scores as integers; they must become Float64.
-    df = pl.DataFrame(
-        {
-            "c3d_metrics_fps_score": pl.Series([100], dtype=pl.Int64),
-            "c3d_metrics_presence_score": pl.Series([75], dtype=pl.Int64),
-        }
-    )
-    result = coerce_types(df)
-    assert result.schema["c3d_metrics_fps_score"] == pl.Float64
-    assert result.schema["c3d_metrics_presence_score"] == pl.Float64
-    assert result["c3d_metrics_fps_score"][0] == pytest.approx(100.0)
-
-
-def test_coerce_types_metric_components_int_cast_to_float64():
-    df = pl.DataFrame(
-        {
-            "c3d_metric_components_comfort_score_head_orientation_score": pl.Series(
-                [80], dtype=pl.Int64
-            ),
-        }
-    )
-    result = coerce_types(df)
-    assert (
-        result.schema["c3d_metric_components_comfort_score_head_orientation_score"]
-        == pl.Float64
-    )
-
-
-def test_coerce_types_roomsize_meters_int_cast_to_float64():
-    df = pl.DataFrame({"c3d_roomsize_meters": pl.Series([9], dtype=pl.Int64)})
-    result = coerce_types(df)
-    assert result.schema["c3d_roomsize_meters"] == pl.Float64
-
-
 def test_coerce_types_non_metric_int_unchanged():
     # project_id and scene_version_id are identifiers and must stay Int64.
     df = pl.DataFrame(
@@ -146,24 +112,6 @@ def test_coerce_types_non_metric_int_unchanged():
     assert result.schema["scene_version_id"] == pl.Int64
 
 
-def test_coerce_types_metric_already_float64_unchanged():
-    df = pl.DataFrame(
-        {"c3d_metrics_fps_score": pl.Series([99.5], dtype=pl.Float64)}
-    )
-    result = coerce_types(df)
-    assert result.schema["c3d_metrics_fps_score"] == pl.Float64
-    assert result["c3d_metrics_fps_score"][0] == pytest.approx(99.5)
-
-
-def test_coerce_types_metric_pandas_dtype_is_float64():
-    pytest.importorskip("pyarrow")
-    pytest.importorskip("pandas")
-    df = pl.DataFrame(
-        {"c3d_metrics_fps_score": pl.Series([100], dtype=pl.Int64)}
-    )
-    result = coerce_types(df)
-    pandas_df = result.to_pandas()
-    assert str(pandas_df["c3d_metrics_fps_score"].dtype) == "float64"
 
 
 def test_coerce_types_casts_null_columns_to_string():
@@ -274,3 +222,176 @@ def test_to_output_invalid():
     df = pl.DataFrame({"a": [1]})
     with pytest.raises(ValueError, match="output must be"):
         to_output(df, "csv")
+
+
+# --- Duplicate column handling (DS-561) ---
+
+
+def test_normalize_columns_triple_duplicate_property_dropped(caplog):
+    """Three property fields that already exist as top-level columns."""
+    df = pl.DataFrame(
+        {
+            "fieldA": ["top_a"],
+            "fieldB": ["top_b"],
+            "fieldC": ["top_c"],
+            "properties": [
+                {"fieldA": "prop_a", "fieldB": "prop_b", "fieldC": "prop_c"}
+            ],
+        }
+    )
+    df = df.with_columns(
+        pl.col("properties").cast(
+            pl.Struct({"fieldA": pl.Utf8, "fieldB": pl.Utf8, "fieldC": pl.Utf8})
+        )
+    )
+    with caplog.at_level(logging.WARNING, logger="cognitive3dpy._transform"):
+        result = normalize_columns(df)
+    assert result["field_a"][0] == "top_a"
+    assert result["field_b"][0] == "top_b"
+    assert result["field_c"][0] == "top_c"
+    assert "properties" not in result.columns
+    assert sum("Dropping duplicate property field" in m for m in caplog.messages) == 3
+
+
+def test_normalize_columns_realistic_project_4460_collision(caplog):
+    """Realistic scenario: c3d.participant.oculus_username (property) collides
+    with c3d_participant_oculus_username (top-level) after cleaning."""
+    df = pl.DataFrame(
+        {
+            "c3d_participant_oculus_username": ["top_level_value"],
+            "c3d.participant.oculus_username": ["dot_notation_value"],
+        }
+    )
+    with caplog.at_level(logging.WARNING, logger="cognitive3dpy._transform"):
+        result = normalize_columns(df)
+    # First occurrence (c3d_participant_oculus_username) kept
+    assert result.shape[1] == 1
+    assert "c3d_participant_oculus_username" in result.columns
+    assert result["c3d_participant_oculus_username"][0] == "top_level_value"
+    assert any("which already exists" in m for m in caplog.messages)
+
+
+def test_normalize_columns_dedup_with_compact():
+    """Dedup should not break compact column selection."""
+    df = pl.DataFrame(
+        {
+            "sessionId": ["s1"],
+            "c3d_participant_oculus_username": ["top_level"],
+            "c3d.participant.oculus_username": ["dot_notation"],
+            "properties": [{"c3d.app.name": "MyApp"}],
+        }
+    )
+    df = df.with_columns(
+        pl.col("properties").cast(pl.Struct({"c3d.app.name": pl.Utf8}))
+    )
+    result = normalize_columns(df)
+    compacted = select_compact(result)
+    # Should not raise — compact selection should work on deduped frame
+    assert "c3d_app_name" in compacted.columns
+    assert compacted.shape[0] == 1
+
+
+def test_normalize_columns_dedup_with_coerce_types_overrides():
+    """Property overrides should apply to the surviving column after dedup."""
+    df = pl.DataFrame(
+        {
+            "c3d.geo.latitude": [42],
+            "c3d_geo_latitude": [43],
+        }
+    )
+    result = normalize_columns(df)
+    # First column (c3d.geo.latitude) kept, cleaned to c3d_geo_latitude
+    assert result.shape[1] == 1
+    assert result["c3d_geo_latitude"][0] == 42
+
+    overrides = {"c3d_geo_latitude": pl.Float64}
+    result = coerce_types(result, property_overrides=overrides)
+    assert result.schema["c3d_geo_latitude"] == pl.Float64
+    assert result["c3d_geo_latitude"][0] == pytest.approx(42.0)
+
+
+# --- Deprecated / renamed columns (DS-583) ---
+
+
+def test_handle_deprecated_warns_with_replacement(recwarn):
+    df = pl.DataFrame({"c3d_metrics_app_performance": [0.8]})
+    result = handle_deprecated_columns(df)
+    # Column stays in the DataFrame
+    assert "c3d_metrics_app_performance" in result.columns
+    assert result["c3d_metrics_app_performance"][0] == 0.8
+    # Warning cites replacement
+    msgs = [str(w.message) for w in recwarn]
+    assert any(
+        "c3d_metrics_app_performance" in m and "c3d_metrics_fps_score" in m
+        for m in msgs
+    )
+
+
+def test_handle_deprecated_warns_without_replacement(recwarn):
+    df = pl.DataFrame({"c3d_metrics_boundary_score": [0.5]})
+    result = handle_deprecated_columns(df)
+    assert "c3d_metrics_boundary_score" in result.columns
+    msgs = [str(w.message) for w in recwarn]
+    assert any(
+        "c3d_metrics_boundary_score" in m and "removed in a future" in m
+        for m in msgs
+    )
+
+
+def test_handle_deprecated_hmd(recwarn):
+    df = pl.DataFrame({"hmd": ["Quest 3"]})
+    result = handle_deprecated_columns(df)
+    assert "hmd" in result.columns
+    msgs = [str(w.message) for w in recwarn]
+    assert any("hmd" in m and "c3d_device_hmd_type" in m for m in msgs)
+
+
+def test_handle_renamed_old_only(recwarn):
+    """Old column exists, new doesn't — should be renamed."""
+    df = pl.DataFrame({
+        "c3d_metrics_head_orientation_score": [0.9],
+    })
+    result = handle_deprecated_columns(df)
+    assert "c3d_metrics_head_orientation_score" not in result.columns
+    new_col = "c3d_metric_components_comfort_score_head_orientation_score"
+    assert new_col in result.columns
+    assert result[new_col][0] == 0.9
+    msgs = [str(w.message) for w in recwarn]
+    assert any("renamed" in m.lower() for m in msgs)
+
+
+def test_handle_renamed_both_exist(recwarn):
+    """Both old and new exist — keep new, drop old."""
+    old = "c3d_metrics_head_orientation_score"
+    new = "c3d_metric_components_comfort_score_head_orientation_score"
+    df = pl.DataFrame({old: [0.7], new: [0.9]})
+    result = handle_deprecated_columns(df)
+    assert old not in result.columns
+    assert new in result.columns
+    assert result[new][0] == 0.9
+
+
+def test_handle_renamed_new_only_no_warning(recwarn):
+    """Only new column exists — no warning, no changes."""
+    new = "c3d_metric_components_comfort_score_head_orientation_score"
+    df = pl.DataFrame({new: [0.9]})
+    result = handle_deprecated_columns(df)
+    assert new in result.columns
+    deprecation_warnings = [
+        w for w in recwarn if issubclass(w.category, DeprecationWarning)
+    ]
+    assert len(deprecation_warnings) == 0
+
+
+def test_handle_no_deprecated_columns_no_warning(recwarn):
+    """DataFrame with only active columns — no warnings."""
+    df = pl.DataFrame({
+        "c3d_metrics_fps_score": [0.9],
+        "c3d_metrics_presence_score": [0.8],
+    })
+    result = handle_deprecated_columns(df)
+    assert result.shape == df.shape
+    deprecation_warnings = [
+        w for w in recwarn if issubclass(w.category, DeprecationWarning)
+    ]
+    assert len(deprecation_warnings) == 0

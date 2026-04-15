@@ -234,10 +234,11 @@ class TestCoerceTypesExisting:
         result = coerce_types(df)
         assert result["tags"][0] == "a, b, c"
 
-    def test_metric_columns_float64(self):
-        df = pl.DataFrame({"c3d_metrics_fps_score": [85]})
-        result = coerce_types(df)
-        assert result.schema["c3d_metrics_fps_score"] == pl.Float64
+    def test_metric_columns_in_property_overrides(self):
+        assert SESSION_PROPERTY_OVERRIDES["c3d_metrics_fps_score"] == pl.Float64
+        key = "c3d_metric_components_comfort_score_head_orientation_score"
+        assert SESSION_PROPERTY_OVERRIDES[key] == pl.Float64
+        assert SESSION_PROPERTY_OVERRIDES["c3d_roomsize_meters"] == pl.Float64
 
     def test_null_columns_become_utf8(self):
         df = pl.DataFrame({"unknown_col": [None, None]})

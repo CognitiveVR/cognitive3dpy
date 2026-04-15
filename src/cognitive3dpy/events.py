@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Literal
 
@@ -129,6 +130,9 @@ def _unnest_events(results: list[dict]) -> pl.DataFrame:
     are unnested into individual columns prefixed with ``prop_``.
     """
     flat: list[dict] = []
+    prop_collisions: set[str] = set()
+    base_collisions: set[str] = set()
+
     for session in results:
         base = {
             "project_id": session.get("projectId"),
@@ -140,23 +144,60 @@ def _unnest_events(results: list[dict]) -> pl.DataFrame:
             "duration": session.get("duration"),
         }
         for event in session.get("events", []):
-            props = {
-                f"prop_{_clean_name(k)}": v
-                for k, v in event.get("properties", {}).items()
+            row = {
+                **base,
+                "event_name": event.get("name"),
+                "event_date": event.get("date"),
+                "position_x": event.get("x"),
+                "position_y": event.get("y"),
+                "position_z": event.get("z"),
+                "object_id": event.get("object"),
+                "scene_version_id": event.get("parentSceneVersionId"),
             }
-            flat.append(
-                {
-                    **base,
-                    "event_name": event.get("name"),
-                    "event_date": event.get("date"),
-                    "position_x": event.get("x"),
-                    "position_y": event.get("y"),
-                    "position_z": event.get("z"),
-                    "object_id": event.get("object"),
-                    "scene_version_id": event.get("parentSceneVersionId"),
-                    **props,
-                }
-            )
+
+            base_keys = set(row.keys())
+            seen: set[str] = set()
+            for k, v in event.get("properties", {}).items():
+                clean_key = f"prop_{_clean_name(k)}"
+                if clean_key in base_keys:
+                    base_collisions.add(clean_key)
+                    continue
+                if clean_key in seen:
+                    prop_collisions.add(clean_key)
+                    continue
+                seen.add(clean_key)
+                row[clean_key] = v
+
+            flat.append(row)
+
+    if base_collisions:
+        sorted_cols = sorted(base_collisions)
+        logger.warning(
+            "Dropping event property column(s) that collide with standard "
+            "event columns: %r.",
+            sorted_cols,
+        )
+        warnings.warn(
+            f"_unnest_events() dropped event property column(s) that "
+            f"collide with standard event columns: {sorted_cols!r}. "
+            f"Standard column values were kept.",
+            UserWarning,
+            stacklevel=2,
+        )
+    if prop_collisions:
+        sorted_cols = sorted(prop_collisions)
+        logger.warning(
+            "Dropping event property column(s) whose cleaned names "
+            "collide with another property: %r.",
+            sorted_cols,
+        )
+        warnings.warn(
+            f"_unnest_events() dropped event property column(s) whose "
+            f"cleaned names collide with another property: "
+            f"{sorted_cols!r}. First occurrence was kept.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     if not flat:
         return pl.DataFrame()
