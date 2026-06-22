@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Source: slicer_fields.yaml (sha256:b9134aad1c87)
+Source: slicer_fields.yaml (sha256:d770bfdaf56f)
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ SESSION_FIELD_TYPES: dict[str, pl.DataType] = {
     "userSessionNumber": pl.Int64,
     "sceneId": pl.Utf8,
     "versionId": pl.Int64,
-    "hmd": pl.Utf8,
     "hmdYawHistogram10degrees": pl.Int64,
     "hmdVirtualYawHistogram10degrees": pl.Int64,
     "hasDynamics": pl.Boolean,
