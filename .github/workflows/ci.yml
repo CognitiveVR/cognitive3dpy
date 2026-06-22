@@ -36,7 +36,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
-          token: ${{ secrets.SLICER_READ_TOKEN }}
 
       - name: Checkout cvr-cortex
         uses: actions/checkout@v4
