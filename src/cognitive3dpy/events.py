@@ -201,7 +201,10 @@ def _unnest_events(results: list[dict]) -> pl.DataFrame:
 
     if not flat:
         return pl.DataFrame()
-    return pl.DataFrame(flat)
+    # infer_schema_length=None: event property columns are sparse — an event may
+    # omit a numeric property entirely. Scan all rows so a null-first property
+    # column isn't typed Null and then fail on a later value (DS-760 bug class).
+    return pl.DataFrame(flat, infer_schema_length=None)
 
 
 

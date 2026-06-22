@@ -500,3 +500,51 @@ def test_numeric_step_timestamp_converted_to_datetime():
     df = c3d_session_objectives(start_date="2025-01-01", end_date="2026-01-01")
     # sessions_with_objectives.json uses integer timestamps
     assert df.schema["step_timestamp"] == pl.Datetime("us", "UTC")
+
+
+@respx.mock
+def test_null_first_rows_do_not_break_schema_inference():
+    """Regression for DS-760 (regression of DS-563).
+
+    Steps that weren't completed/timed have null timestamp/duration. When the
+    first 100 rows are all-null, polars must not type those columns as Null and
+    then fail to append a real int on row 101. Building the DataFrame with
+    ``infer_schema_length=None`` scans every row first.
+    """
+    # 100 sessions with a null-timestamp/duration step, then sessions with a
+    # real integer epoch-ms timestamp + duration. Returned for both scene
+    # versions, so the combined rows lead with >100 all-null rows.
+    null_step = {"step": 1, "timestamp": None, "duration": None, "result": "failed"}
+    real_step = {"step": 1, "timestamp": 1718459400000, "duration": 94337,
+                 "result": "succeeded"}
+    results = [
+        {
+            "sessionId": f"sess-{i:03d}",
+            "projectId": 1234,
+            "participantId": f"user-{i}",
+            "date": "2025-06-15T14:30:00Z",
+            "objectiveResults": {"100": [null_step if i < 100 else real_step]},
+        }
+        for i in range(105)
+    ]
+    sessions_payload = {"count": len(results), "pages": 1, "results": results}
+
+    respx.get(PROJECT_URL).mock(
+        return_value=httpx.Response(200, json=load_fixture("project.json"))
+    )
+    respx.get(OBJECTIVES_URL).mock(
+        return_value=httpx.Response(200, json=load_fixture("objectives.json"))
+    )
+    _mock_objectives_deps(respx)
+    respx.post(SESSIONS_URL).mock(
+        return_value=httpx.Response(200, json=sessions_payload)
+    )
+
+    # Pre-fix this raised: "could not append value: 94337 of type: i64".
+    df = c3d_session_objectives(start_date="2025-01-01", end_date="2026-01-01")
+
+    assert df.shape[0] == 210  # 105 sessions × 2 scene versions
+    # Columns resolved to real types, not Null/Utf8 collapsed from null-first rows.
+    assert df.schema["step_timestamp"] == pl.Datetime("us", "UTC")
+    assert df.schema["step_duration"] in (pl.Int64, pl.Float64)
+    assert df["step_duration"].drop_nulls().to_list().count(94337) == 10

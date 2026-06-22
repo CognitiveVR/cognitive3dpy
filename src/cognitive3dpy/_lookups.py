@@ -346,7 +346,9 @@ def fetch_objectives_metadata(project_id: int) -> dict:
         )
     )
     components_df = (
-        pl.DataFrame(comp_rows)
+        # infer_schema_length=None: non-step components leave step_number/step_type
+        # null, so scan all rows to avoid a Null-typed column (DS-760 bug class).
+        pl.DataFrame(comp_rows, infer_schema_length=None)
         if comp_rows
         else pl.DataFrame(
             schema={

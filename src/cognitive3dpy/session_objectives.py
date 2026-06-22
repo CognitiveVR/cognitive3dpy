@@ -203,7 +203,12 @@ def c3d_session_objectives(
             warn_if_empty(empty_frame("objective"), "c3d_session_objectives")
         return to_output(empty_frame("objective"), output)
 
-    df = pl.DataFrame(all_rows)
+    # infer_schema_length=None scans every row before deciding column types.
+    # objectiveResults steps leave step_timestamp/step_duration null when a step
+    # wasn't completed/timed; if the first 100 rows are all-null polars would
+    # type the column Null and then fail to append a later int (DS-760, a
+    # regression of the DS-563 sweep). coerce_types() handles the final types.
+    df = pl.DataFrame(all_rows, infer_schema_length=None)
     df = coerce_types(df)
 
     return to_output(df, output)

@@ -206,5 +206,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Claude Code / planning-companion (local AI tooling — not for a public repo)
+.claude/
+.companion-state/
+
 # other files to ignore
 **/.DS_Store
