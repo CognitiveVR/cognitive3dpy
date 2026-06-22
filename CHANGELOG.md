@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.2.2 (2026-06-22)
+
+### Bug Fixes
+
+- Use GITHUB_TOKEN for schema-sync auto-commit push
+  ([`9aeb35b`](https://github.com/CognitiveVR/cognitive3dpy/commit/9aeb35b74ef66cf45af1fe525186bbee9dd554aa))
+
+### Testing
+
+- Revert schema to stale blob to exercise schema-sync push
+  ([`3ef17e4`](https://github.com/CognitiveVR/cognitive3dpy/commit/3ef17e4d281344673f0ddc2208f7eef3970c9b82))
+
+
 ## v1.2.1 (2026-06-22)
 
 ### Bug Fixes
