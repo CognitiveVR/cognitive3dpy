@@ -173,7 +173,9 @@ def _parse_objective_results(
         }
         for r in raw_results
     ]
-    df = pl.DataFrame(rows)
+    # infer_schema_length=None: scan all rows so a null-first objectiveVersionId
+    # column isn't typed Null and then fail on a later int (DS-760 bug class).
+    df = pl.DataFrame(rows, infer_schema_length=None)
     df = _add_completion_rate(df)
     df = df.join(
         metadata["versions"].select(
@@ -263,7 +265,10 @@ def _fetch_step_results(
         logger.info("No step results found.")
         return pl.DataFrame()
 
-    df = pl.DataFrame(all_steps)
+    # infer_schema_length=None: avg_completion_time_s/avg_step_duration_s are
+    # null when the API omits the timing; scan all rows so a null-first column
+    # isn't typed Null and then fail on a later float (DS-760 bug class).
+    df = pl.DataFrame(all_steps, infer_schema_length=None)
     df = _add_completion_rate(df, col_name="step_completion_rate")
 
     # Join version → objective_id, version_number
