@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.1 (2026-06-22)
+
+### Bug Fixes
+
+- Explicit schema inference for objective/event DataFrames (DS-760)
+  ([`2c40797`](https://github.com/CognitiveVR/cognitive3dpy/commit/2c40797b7854f45975ffe79c14f8d0889e5fb1fb))
+
+
 ## v1.2.0 (2026-04-15)
 
 ### Features
