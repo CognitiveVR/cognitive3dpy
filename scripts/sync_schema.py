@@ -49,6 +49,7 @@ PROPERTY_SECTION_MAP: dict[str, str] = {
 PROPERTY_TYPE_OVERRIDES: dict[str, str] = {
     "c3d.participant.height": "pl.Float64",
     "c3d.participant.armlength": "pl.Float64",
+    "c3d.participant.hmdHeight": "pl.Float64",
     "c3d.participant.Age": "pl.Float64",
     "c3d.multiplayer.port": "pl.Int64",
 }
@@ -58,7 +59,7 @@ PROPERTY_TYPE_OVERRIDES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 YAML_CANDIDATES: list[str] = [
-    "../cvr-cortex/doc/slicer_fields.yaml",
+    "../cvr-cortex/features/slicer/slicer_fields.yaml",
     "../cvr-slicer/doc/slicer_fields.yaml",
 ]
 
