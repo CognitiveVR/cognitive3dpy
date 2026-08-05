@@ -52,6 +52,10 @@ testpaths = ["tests"]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 commit_message = "chore(release): v{version} [skip ci]"
+# Refresh uv.lock after the version bump and include it in the release
+# commit — otherwise the lock's own-package version lags every release.
+build_command = "uv lock"
+assets = ["uv.lock"]
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = ["^chore"]
