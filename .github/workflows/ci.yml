@@ -44,7 +44,7 @@ jobs:
           repository: CognitiveVR/cvr-cortex
           token: ${{ secrets.SLICER_READ_TOKEN }}
           path: cvr-cortex
-          sparse-checkout: doc/slicer_fields.yaml
+          sparse-checkout: features/slicer/slicer_fields.yaml
           sparse-checkout-cone-mode: false
 
       - name: Checkout cvr-slicer (fallback)
@@ -66,8 +66,8 @@ jobs:
 
       - name: Sync schema
         run: |
-          if [ -f cvr-cortex/doc/slicer_fields.yaml ]; then
-            YAML_PATH=cvr-cortex/doc/slicer_fields.yaml
+          if [ -f cvr-cortex/features/slicer/slicer_fields.yaml ]; then
+            YAML_PATH=cvr-cortex/features/slicer/slicer_fields.yaml
           elif [ -f cvr-slicer/doc/slicer_fields.yaml ]; then
             YAML_PATH=cvr-slicer/doc/slicer_fields.yaml
           else
