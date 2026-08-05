@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.3 (2026-08-05)
+
+### Bug Fixes
+
+- **schema-sync**: Point at cortex registry's real path, add hmdHeight type override
+  ([`171a972`](https://github.com/CognitiveVR/cognitive3dpy/commit/171a9728ab44ca5db6a91eb83a7e931eb80e3714))
+
+
 ## v1.2.2 (2026-06-22)
 
 ### Bug Fixes
