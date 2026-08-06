@@ -1,6 +1,6 @@
 """Generate _schema_generated.py from slicer_fields.yaml.
 
-Reads the authoritative field definitions from cvr-slicer (or cvr-cortex)
+Reads the authoritative field definitions from the cvr-cortex registry
 and produces a Python module with Polars type mappings. The generated file
 is committed to the repo so the package works without the YAML present.
 
@@ -60,7 +60,6 @@ PROPERTY_TYPE_OVERRIDES: dict[str, str] = {
 
 YAML_CANDIDATES: list[str] = [
     "../cvr-cortex/features/slicer/slicer_fields.yaml",
-    "../cvr-slicer/doc/slicer_fields.yaml",
 ]
 
 OUTPUT_PATH = (

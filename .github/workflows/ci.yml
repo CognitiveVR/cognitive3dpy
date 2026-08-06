@@ -47,16 +47,6 @@ jobs:
           sparse-checkout: features/slicer/slicer_fields.yaml
           sparse-checkout-cone-mode: false
 
-      - name: Checkout cvr-slicer (fallback)
-        uses: actions/checkout@v4
-        continue-on-error: true
-        with:
-          repository: CognitiveVR/cvr-slicer
-          token: ${{ secrets.SLICER_READ_TOKEN }}
-          path: cvr-slicer
-          sparse-checkout: doc/slicer_fields.yaml
-          sparse-checkout-cone-mode: false
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -68,11 +58,9 @@ jobs:
         run: |
           if [ -f cvr-cortex/features/slicer/slicer_fields.yaml ]; then
             YAML_PATH=cvr-cortex/features/slicer/slicer_fields.yaml
-          elif [ -f cvr-slicer/doc/slicer_fields.yaml ]; then
-            YAML_PATH=cvr-slicer/doc/slicer_fields.yaml
           else
-            echo "::warning::slicer_fields.yaml not found in either repo — skipping schema sync"
-            exit 0
+            echo "::error::cvr-cortex registry not available (checkout failed or file moved) — schema sync cannot run"
+            exit 1
           fi
 
           python scripts/sync_schema.py "$YAML_PATH"

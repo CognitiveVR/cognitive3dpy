@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 # Candidate locations for slicer_fields.yaml relative to repo root
 _YAML_CANDIDATES = [
     "../cvr-cortex/features/slicer/slicer_fields.yaml",
-    "../cvr-slicer/doc/slicer_fields.yaml",
 ]
 
 
