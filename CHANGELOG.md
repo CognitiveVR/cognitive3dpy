@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.2.4 (2026-08-06)
+
+### Bug Fixes
+
+- **release**: Refresh uv.lock in the release commit
+  ([`3f5211c`](https://github.com/CognitiveVR/cognitive3dpy/commit/3f5211ce6ce8beb13a07fd58826d8f0cd3537f73))
+
+- **schema-sync**: Remove cvr-slicer fallback — cortex registry is the sole source
+  ([`b0c03c8`](https://github.com/CognitiveVR/cognitive3dpy/commit/b0c03c87c1bb50ffc3c50d1358631808c3583c61))
+
+
 ## v1.2.3 (2026-08-05)
 
 ### Bug Fixes
