@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Source: slicer_fields.yaml (sha256:200561bfab9f)
+Source: slicer_fields.yaml (sha256:82af147d51f5)
 """
 
 from __future__ import annotations
@@ -50,6 +50,10 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.app.sdktype": pl.Utf8,
     "c3d.version": pl.Utf8,
     "c3d.app.xrplugin": pl.Utf8,
+    "c3d.app.openxr.runtime.name": pl.Utf8,
+    "c3d.app.openxr.runtime.version": pl.Utf8,
+    "c3d.app.xr.inputsubsystems": pl.Utf8,
+    "c3d.app.package": pl.Utf8,
     "c3d.app.oculus.appid": pl.Utf8,
     "c3d.app.plugin.version": pl.Utf8,
     "c3d.app.androidPlugin.version": pl.Utf8,
@@ -73,6 +77,7 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.device.cpu.vendor": pl.Utf8,
     "c3d.device.gpu": pl.Utf8,
     "c3d.device.gpu.vendor": pl.Utf8,
+    "c3d.device.platform_name": pl.Utf8,
     "c3d.device.vendor": pl.Utf8,
     "c3d.device.serialnumber": pl.Utf8,
     "c3d.device.serial_number": pl.Utf8,
@@ -136,11 +141,15 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.geo.longitude": pl.Float64,
     "c3d.geo.altitude": pl.Float64,
     "c3d.device.memory": pl.Float64,
+    "c3d.device.memoryInMegabytes": pl.Float64,
     "c3d.device.memory_gb": pl.Float64,
     "c3d.device.derived.taxonomy_version": pl.Float64,
     "c3d.device.os.sdk_int": pl.Float64,
     "c3d.device.screen.width": pl.Float64,
     "c3d.device.screen.height": pl.Float64,
+    "c3d.device.gpu.vendor.id": pl.Float64,
+    "c3d.app.xr.eyetexture.width": pl.Float64,
+    "c3d.app.xr.eyetexture.height": pl.Float64,
     "c3d.device.available.cpu.threads": pl.Float64,
     "c3d.deviceid.confidence": pl.Float64,
     "c3d.network.downlink": pl.Float64,
@@ -255,6 +264,7 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.app.handtracking.declined": pl.Boolean,
     "c3d.app.handtracking.error": pl.Boolean,
     "c3d.app.meta.wasSpaceWarpUsed": pl.Boolean,
+    "c3d.app.passthrough.supported": pl.Boolean,
     "xrpf.allowed.location.data": pl.Boolean,
     "xrpf.allowed.hardware.data": pl.Boolean,
     "xrpf.allowed.bio.data": pl.Boolean,
