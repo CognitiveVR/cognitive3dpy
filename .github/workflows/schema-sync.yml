@@ -1,0 +1,88 @@
+name: Schema sync
+
+# Keeps the generated Polars schema (src/cognitive3dpy/_schema_generated.py)
+# in sync with the canonical registry in cvr-cortex. Sparse-checkout cortex
+# with a read token, run the sync script, and auto-commit the regenerated
+# module. Fails loudly if the cortex registry is unavailable — never falls
+# back to a stale source (DS-1038).
+#
+# Two delivery paths (mirrors cvr-analyst's registry-sync.yml):
+#   pull_request      — auto-commit the regenerated schema onto the PR
+#                       branch (the self-heal backstop).
+#   workflow_dispatch — fired by cortex's registry-dispatch workflow on a
+#                       registry change (DS-1044). main is protected, so
+#                       this path pushes the schema-sync-auto branch and
+#                       opens (or refreshes) a PR instead.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  schema-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Checkout cvr-cortex
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: CognitiveVR/cvr-cortex
+          token: ${{ secrets.SLICER_READ_TOKEN }}
+          path: cvr-cortex
+          sparse-checkout: features/slicer/slicer_fields.yaml
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Sync schema
+        run: |
+          if [ -f cvr-cortex/features/slicer/slicer_fields.yaml ]; then
+            YAML_PATH=cvr-cortex/features/slicer/slicer_fields.yaml
+          else
+            echo "::error::cvr-cortex registry not available (checkout failed or file moved) — schema sync cannot run"
+            exit 1
+          fi
+
+          python scripts/sync_schema.py "$YAML_PATH"
+          if git diff --exit-code src/cognitive3dpy/_schema_generated.py; then
+            echo "Schema is up to date."
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add src/cognitive3dpy/_schema_generated.py
+            git commit -m "chore: auto-sync schema from slicer_fields.yaml [skip ci]"
+            git push
+            echo "::notice::Schema was out of date — auto-committed update."
+          else
+            # workflow_dispatch: main is protected, deliver via PR
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -B schema-sync-auto
+            git add src/cognitive3dpy/_schema_generated.py
+            git commit -m "chore: auto-sync schema from slicer_fields.yaml"
+            git push -f origin schema-sync-auto
+            if gh pr list --head schema-sync-auto --state open --json number -q '.[0].number' | grep -q .; then
+              echo "::notice::Schema sync PR already open — branch refreshed."
+            else
+              gh pr create --base main --head schema-sync-auto \
+                --title "chore: auto-sync schema from cvr-cortex registry" \
+                --body "Automated schema regeneration, dispatched by cvr-cortex registry-dispatch (DS-1044) after a canonical registry change on cortex main. Diff is src/cognitive3dpy/_schema_generated.py only."
+              echo "::notice::Schema was out of date — opened schema-sync-auto PR."
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
