@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-08-11)
+
+### Features
+
+- **ci**: Dispatchable schema-sync workflow with PR delivery (DS-1044)
+  ([`120dffa`](https://github.com/CognitiveVR/cognitive3dpy/commit/120dffa1b0ae06c3adf8c23dc892ece08beefce2))
+
+
 ## v1.2.4 (2026-08-06)
 
 ### Bug Fixes
