@@ -21,6 +21,11 @@ on:
 
 jobs:
   schema-sync:
+    # Dependabot PRs read from the Dependabot secret store, so
+    # SLICER_READ_TOKEN resolves empty and the cortex checkout cannot run.
+    # Their GITHUB_TOKEN is read-only too, so the auto-commit push would
+    # fail as well. A dependency bump can never change the generated schema.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
