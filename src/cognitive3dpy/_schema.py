@@ -18,8 +18,10 @@ import logging
 import polars as pl
 
 from cognitive3dpy._schema_generated import (
+    DEPRECATED_KEYS,
     SESSION_FIELD_TYPES,
     SESSION_PROPERTY_TYPES,
+    SUNSETTED_KEYS,
 )
 from cognitive3dpy._transform import _clean_name
 
@@ -76,6 +78,12 @@ DEPRECATED_PROPERTIES: dict[str, str | None] = {
     "c3d.metrics.controller_events_score": None,
     "c3d.metrics.controller_engagement_score": None,
     "c3d.metrics.dynamic_engagement_score": None,
+    "c3d.metrics.standing_percentage":
+        "c3d.metric_components.posture_standing_percentage",
+    # Superseded by a drain *rate*, which has no single successor key —
+    # compute it from c3d.metric_components.battery_drain_sum and
+    # c3d.metric_components.battery_drain_time_millis (compact=False).
+    "c3d.metrics.battery_efficiency": None,
 }
 
 # Renamed properties: old_name → new_name (same data, new path)
@@ -105,6 +113,17 @@ DEPRECATED_COLUMNS: dict[str, str | None] = {
 }
 # Top-level fields that are already normalized (not c3d.* properties)
 DEPRECATED_COLUMNS["hmd"] = "c3d_device_hmd_type"
+
+# Registry lifecycle flags, normalized to column names. Unlike the curated
+# maps above these are generated from slicer_fields.yaml, so they track the
+# registry on every schema sync. Used to guard SESSIONS_COMPACT_COLUMNS
+# against drift (see tests/test_compact_columns.py).
+DEPRECATED_REGISTRY_COLUMNS: frozenset[str] = frozenset(
+    _clean_name(k) for k in DEPRECATED_KEYS
+)
+SUNSETTED_REGISTRY_COLUMNS: frozenset[str] = frozenset(
+    _clean_name(k) for k in SUNSETTED_KEYS
+)
 
 RENAMED_COLUMNS: dict[str, str] = {
     _clean_name(k): _clean_name(v)
