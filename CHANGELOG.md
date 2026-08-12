@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-08-12)
+
+### Continuous Integration
+
+- Skip schema-sync on Dependabot PRs
+  ([`10566ac`](https://github.com/CognitiveVR/cognitive3dpy/commit/10566ac1f12fb1aab749e92c3cb9b8d7cd2a0f9c))
+
+### Features
+
+- **schema**: Emit registry lifecycle flags from slicer_fields.yaml
+  ([`5ecec37`](https://github.com/CognitiveVR/cognitive3dpy/commit/5ecec37f8c1e11b941571c74d4a0b2f46629b37c))
+
+- **sessions**: Drop registry-deprecated columns from compact output
+  ([`ef883a5`](https://github.com/CognitiveVR/cognitive3dpy/commit/ef883a542a56b2e7e9e4731d3333499175b81a92))
+
+### Testing
+
+- Guard compact columns against registry drift
+  ([`f4fe389`](https://github.com/CognitiveVR/cognitive3dpy/commit/f4fe389b24ee49de6df76bcc3e3cd9cdaf641976))
+
+
 ## v1.3.0 (2026-08-11)
 
 ### Features
