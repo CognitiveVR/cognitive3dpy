@@ -100,6 +100,39 @@ def parse_fields(fields_dict: dict) -> dict[str, str]:
     return result
 
 
+def collect_lifecycle(section: dict, grouped: bool) -> tuple[set[str], set[str]]:
+    """Collect keys carrying the registry lifecycle flags.
+
+    The YAML marks two orthogonal facts (see the slicer_fields.yaml header):
+    ``deprecated`` is a consumption-side intent (stop reading this key) and
+    ``sunsetted`` is a production-side fact (no shipping SDK emits it).
+
+    *grouped* is True for property sections, which nest their entries one
+    level deeper under a type section (textual/numerical/boolean).
+    Returns ``(deprecated_keys, sunsetted_keys)``.
+    """
+    deprecated: set[str] = set()
+    sunsetted: set[str] = set()
+
+    def scan(entries: dict) -> None:
+        for key, meta in entries.items():
+            if not isinstance(meta, dict):
+                continue
+            if meta.get("deprecated"):
+                deprecated.add(key)
+            if meta.get("sunsetted"):
+                sunsetted.add(key)
+
+    if grouped:
+        for section_entries in section.values():
+            if isinstance(section_entries, dict):
+                scan(section_entries)
+    else:
+        scan(section)
+
+    return deprecated, sunsetted
+
+
 def parse_properties(properties_dict: dict) -> dict[str, str]:
     """Parse a session_properties or event_properties section.
 
@@ -143,6 +176,17 @@ def format_dict(
     return "\n".join(lines)
 
 
+def format_set(name: str, entries: set[str], indent: str = "    ") -> str:
+    """Format a set of keys as a frozenset constant declaration."""
+    if not entries:
+        return f"{name}: frozenset[str] = frozenset()"
+
+    lines = [f"{name}: frozenset[str] = frozenset({{"]
+    lines.extend(f'{indent}"{key}",' for key in sorted(entries))
+    lines.append("})")
+    return "\n".join(lines)
+
+
 def generate(yaml_path: Path) -> str:
     """Read the YAML and produce the generated module source."""
     with open(yaml_path) as f:
@@ -152,6 +196,20 @@ def generate(yaml_path: Path) -> str:
     session_properties = parse_properties(data.get("session_properties", {}))
     event_fields = parse_fields(data.get("event_fields", {}))
     event_properties = parse_properties(data.get("event_properties", {}))
+
+    # Lifecycle flags across every section — session and event, fields and
+    # properties — collapsed into two flat sets of raw registry keys.
+    deprecated_keys: set[str] = set()
+    sunsetted_keys: set[str] = set()
+    for section_name, grouped in (
+        ("session_fields", False),
+        ("event_fields", False),
+        ("session_properties", True),
+        ("event_properties", True),
+    ):
+        dep, sun = collect_lifecycle(data.get(section_name, {}), grouped)
+        deprecated_keys |= dep
+        sunsetted_keys |= sun
 
     yaml_name = yaml_path.name
     yaml_hash = hashlib.sha256(yaml_path.read_bytes()).hexdigest()[:12]
@@ -202,6 +260,19 @@ def generate(yaml_path: Path) -> str:
         "# " + "=" * 77,
         "",
         format_dict("EVENT_PROPERTY_TYPES", event_properties),
+        "",
+        "",
+        "# " + "=" * 77,
+        "# LIFECYCLE FLAGS",
+        "# Raw registry keys (session + event, fields + properties) carrying",
+        '# "deprecated: true" (consumers should stop reading the key) or',
+        '# "sunsetted: true" (no shipping SDK emits it). The two compose freely.',
+        "# " + "=" * 77,
+        "",
+        format_set("DEPRECATED_KEYS", deprecated_keys),
+        "",
+        "",
+        format_set("SUNSETTED_KEYS", sunsetted_keys),
         "",
     ]
 
