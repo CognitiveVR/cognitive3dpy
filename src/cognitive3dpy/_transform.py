@@ -94,11 +94,12 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "c3d_roomsize_meters",
     # Key metrics (top-level scores)
     "c3d_metrics_fps_score",
+    # Registry status is deliberately "active" despite melder's deletion
+    # intent — see cvr-cortex investigations/average-fps-intended-deletion-
+    # vs-live-consumer.md. Do not drop this without revisiting that note.
     "c3d_metrics_average_fps",
     "c3d_metrics_presence_score",
     "c3d_metrics_comfort_score",
-    "c3d_metrics_battery_efficiency",
-    "c3d_metrics_standing_percentage",
     "c3d_metrics_cyberwellness_score",
     # Metric components (sub-scores)
     "c3d_metric_components_fps_score_degree_app_performance",
@@ -121,6 +122,8 @@ SESSIONS_COMPACT_COLUMNS: list[str] = [
     "c3d_metric_components_cyberwellness_translational_movement",
     "c3d_metric_components_cyberwellness_translational_speed",
     "c3d_metric_components_cyberwellness_continuous_movement",
+    # Replaces the retired c3d.metrics.standing_percentage compute.
+    "c3d_metric_components_posture_standing_percentage",
     # Controller ergo counts
     "c3d_metric_components_controller_ergo_counts_forwards_near",
     "c3d_metric_components_controller_ergo_counts_forwards_medium",
