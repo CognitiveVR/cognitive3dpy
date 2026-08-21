@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Source: slicer_fields.yaml (sha256:f73b13a493a3)
+Source: slicer_fields.yaml (sha256:ec36b4ca36e5)
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ SESSION_FIELD_TYPES: dict[str, pl.DataType] = {
     "hmd": pl.Utf8,
     "hmdYawHistogram10degrees": pl.Int64,
     "hmdVirtualYawHistogram10degrees": pl.Int64,
+    "hasBoundary": pl.Boolean,
     "hasDynamics": pl.Boolean,
     "hasFixations": pl.Boolean,
     "hasGazes": pl.Boolean,
