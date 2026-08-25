@@ -1,0 +1,41 @@
+name: Slack PR notify
+
+# Posts to Slack when a PR opens against main. Complements the org-wide
+# GitHub Slack app subscription with an explicit, repo-specific message.
+#
+# Covers human PRs only: PRs opened by schema-sync.yml with the default
+# GITHUB_TOKEN cannot trigger pull_request workflows (GitHub anti-recursion
+# rule), so schema-sync.yml posts its own notification after `gh pr create`.
+# Dependabot PRs are skipped — dependabot-triggered runs read from the
+# Dependabot secret store where SLACK_WEBHOOK_URL is not defined, and the
+# GitHub Slack app already announces them.
+#
+# PR title is passed through an env var and JSON-encoded with jq rather than
+# interpolated into the payload, so titles containing quotes or YAML syntax
+# can't break the message (or inject into the shell).
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+    branches: [main]
+
+jobs:
+  notify:
+    if: github.actor != 'dependabot[bot]' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          payload=$(jq -n \
+            --arg text "New PR in ${GITHUB_REPOSITORY}: <${PR_URL}|#${PR_NUMBER} ${PR_TITLE}> by ${PR_AUTHOR} (${PR_HEAD} → ${PR_BASE})" \
+            '{text: $text}')
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"

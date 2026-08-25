@@ -87,7 +87,26 @@ jobs:
                 --title "chore: auto-sync schema from cvr-cortex registry" \
                 --body "Automated schema regeneration, dispatched by cvr-cortex registry-dispatch (DS-1044) after a canonical registry change on cortex main. Diff is src/cognitive3dpy/_schema_generated.py only."
               echo "::notice::Schema was out of date — opened schema-sync-auto PR."
+              echo "pr_created=true" >> "$GITHUB_OUTPUT"
             fi
           fi
+        id: sync
         env:
           GH_TOKEN: ${{ github.token }}
+
+      # PRs opened above use the default GITHUB_TOKEN, which cannot trigger
+      # the slack-pr-notify.yml pull_request workflow (GitHub anti-recursion
+      # rule) — so announce the PR to Slack from here instead.
+      - name: Notify Slack of schema sync PR
+        if: steps.sync.outputs.pr_created == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr_url=$(gh pr list --head schema-sync-auto --state open \
+            --json url -q '.[0].url')
+          payload=$(jq -n \
+            --arg text "New PR in ${GITHUB_REPOSITORY}: <${pr_url}|chore: auto-sync schema from cvr-cortex registry> by schema-sync automation (schema-sync-auto → main)" \
+            '{text: $text}')
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
