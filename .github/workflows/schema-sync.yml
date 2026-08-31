@@ -82,6 +82,7 @@ jobs:
             git push -f origin schema-sync-auto
             if gh pr list --head schema-sync-auto --state open --json number -q '.[0].number' | grep -q .; then
               echo "::notice::Schema sync PR already open — branch refreshed."
+              echo "pr_refreshed=true" >> "$GITHUB_OUTPUT"
             else
               gh pr create --base main --head schema-sync-auto \
                 --title "chore: auto-sync schema from cvr-cortex registry" \
@@ -94,19 +95,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # PRs opened above use the default GITHUB_TOKEN, which cannot trigger
-      # the slack-pr-notify.yml pull_request workflow (GitHub anti-recursion
-      # rule) — so announce the PR to Slack from here instead.
+      # Announce the PR from here: slack-pr-notify.yml skips bot-opened PRs
+      # (their pull_request runs park at action_required and would announce
+      # a second time on approval — observed on PR #37, 2026-08-31). A
+      # refresh (force-push to an open PR) re-parks the checks, so it
+      # notifies too (DS-1133).
       - name: Notify Slack of schema sync PR
-        if: steps.sync.outputs.pr_created == 'true'
+        if: steps.sync.outputs.pr_created == 'true' || steps.sync.outputs.pr_refreshed == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
+          REFRESHED: ${{ steps.sync.outputs.pr_refreshed }}
         run: |
           pr_url=$(gh pr list --head schema-sync-auto --state open \
             --json url -q '.[0].url')
+          verb="opened"
+          if [ "$REFRESHED" = "true" ]; then verb="refreshed"; fi
           payload=$(jq -n \
-            --arg text "New PR in ${GITHUB_REPOSITORY}: <${pr_url}|chore: auto-sync schema from cvr-cortex registry> by schema-sync automation (schema-sync-auto → main)" \
+            --arg text ":arrows_counterclockwise: Schema sync PR ${verb} in ${GITHUB_REPOSITORY}: <${pr_url}|chore: auto-sync schema from cvr-cortex registry>. Its checks are parked at *action_required* — open the PR, hit *Approve and run workflows* under Checks, then merge. <@U0820C4GQ9E> <@U0574KJ4USH>" \
+            '{text: $text}')
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "$payload" "$SLACK_WEBHOOK_URL"
+
+      # Cortex's dispatch leg only sees "queued" (204) — a failure here,
+      # e.g. an expired SLICER_READ_TOKEN, is invisible from cortex.
+      - name: Notify Slack of sync failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not set — skipping Slack notification."
+            exit 0
+          fi
+          payload=$(jq -n \
+            --arg text ":x: Schema sync failed in ${GITHUB_REPOSITORY} — could not regenerate from the cortex registry. Usual cause: SLICER_READ_TOKEN expired. ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} <@U0820C4GQ9E> <@U0574KJ4USH>" \
             '{text: $text}')
           curl -sf -X POST -H 'Content-type: application/json' \
             --data "$payload" "$SLACK_WEBHOOK_URL"
