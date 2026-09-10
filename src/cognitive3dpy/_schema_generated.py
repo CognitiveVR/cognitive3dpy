@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Source: slicer_fields.yaml (sha256:4901ca640e47)
+Source: slicer_fields.yaml (sha256:dab5499c0de6)
 """
 
 from __future__ import annotations
@@ -322,6 +322,7 @@ DEPRECATED_KEYS: frozenset[str] = frozenset({
     "c3d.metric_components.vertical_reach_score",
     "c3d.metrics.app_performance",
     "c3d.metrics.battery_efficiency",
+    "c3d.metrics.boundary_relative_yaw",
     "c3d.metrics.boundary_score",
     "c3d.metrics.controller_engagement_score",
     "c3d.metrics.controller_ergonomic_score",
@@ -332,6 +333,7 @@ DEPRECATED_KEYS: frozenset[str] = frozenset({
     "c3d.metrics.immersion_score",
     "c3d.metrics.orientation_score",
     "c3d.metrics.standing_percentage",
+    "c3d.metrics.virtual_yaw",
     "c3d.participant.hmdHeight",
     "c3d.roomsize",
 })
