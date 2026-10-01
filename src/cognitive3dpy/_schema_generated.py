@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Source: slicer_fields.yaml (sha256:dab5499c0de6)
+Source: slicer_fields.yaml (sha256:d6d7d7008845)
 """
 
 from __future__ import annotations
@@ -244,6 +244,9 @@ SESSION_PROPERTY_TYPES: dict[str, pl.DataType] = {
     "c3d.metric_components.cyberwellness.translational_speed": pl.Float64,
     "c3d.metric_components.cyberwellness.translational_movement": pl.Float64,
     "c3d.metric_components.cyberwellness.visual_continuity": pl.Float64,
+    "c3d.metric_components.cyberwellness.angular_rotation": pl.Float64,
+    "c3d.metric_components.cyberwellness.angular_dose": pl.Float64,
+    "c3d.metric_components.cyberwellness.rotation_events": pl.Float64,
     "c3d.session_tag.test": pl.Boolean,
     "c3d.session_tag.junk": pl.Boolean,
     "c3d.app.inEditor": pl.Boolean,
