@@ -146,7 +146,62 @@ polls = c3d.c3d_exitpoll()
 polls = c3d.c3d_exitpoll(hook="end_questions", version=3)
 ```
 
+## LeRobot Datasets (Robotics)
+
+`session_downloader` turns a session into a [LeRobot](https://github.com/huggingface/lerobot) dataset for robot learning: head pose, gaze, sensors, events, camera frames, lidar and the play-area boundary, aligned on one clock.
+
+```bash
+pip install "cognitive3dpy[lerobot]"   # Python 3.12+; cannot be combined with the pandas extra
+```
+
+```python
+import cognitive3dpy as c3d
+from cognitive3dpy import session_downloader
+
+c3d.c3d_auth()  # reads C3D_API_KEY
+session_downloader.download(output="datasets", project_id=700, session_id="1790083950_tb4-sim-fedora")
+```
+
+The dataset is written to `datasets/cognitive3d/<session_id>` (`output` defaults to `datasets`), checked by loading it with lerobot, and opens with `LeRobotDataset(repo_id, root=path)` or `result.load()`. Progress bars show each download step. To look at it:
+
+```bash
+lerobot-dataset-viz --repo-id cognitive3d/<session_id> --root datasets/cognitive3d/<session_id> --mode local --episode-index 0
+```
+
+`lerobot-dataset-viz` plots `observation.state` and the camera images; the other features are in the dataset but that viewer does not chart them.
+
+| Feature | Shape | From |
+|---|---|---|
+| `observation.state` | (3,), or (7,) with `head_rotation=True` | head position (+ quaternion) |
+| `observation.gaze` | (3,) | gaze point; NaN when the gaze hit an object |
+| `observation.sensors` | (channels,) | sensor channels, named in the feature's `names` |
+| `observation.event` | (1,) int64 | index into `event_names` in `c3d/download.json`, else -1 |
+| `observation.images.<camera>` | (H, W, 3) | camera frames |
+| `observation.camera.<camera>.pose` | (7,) | camera pose px, py, pz, qx, qy, qz, qw |
+| `observation.lidar.<sensor>.ranges` | (beams,) | laserscan ranges in metres; NaN for no return or out of range |
+| `observation.lidar.<sensor>.scan_index` | (1,) int64 | point cloud held at this step, a file in the sidecar (below); -1 before the first |
+| `observation.lidar.<sensor>.pose` | (7,) | pose of the held lidar scan |
+| `observation.boundary.pose` | (7,) | play-area boundary pose |
+| `observation.boundary.shape_index` | (1,) int64 | boundary polygon in effect, an entry in `boundary.json`; -1 before the first |
+| `observation.c3d_time_ms` | (1,) int64 | real capture time, epoch ms |
+
+- **One session per episode** — pass a list of `session_id`s (with `repo_id="org/name"`) for a multi-episode dataset.
+- **Clock** — frames follow the camera when the session has one, otherwise the gaze stream; `clock="fixed:10"` resamples onto an exact grid. Other streams are sample-and-held.
+- **Coordinates** — Cognitive3D records left-handed, Y-up, metres; datasets are converted to right-handed, Y-up by mirroring X (positions `(-x, y, z)`, quaternions `(qx, -qy, -qz, qw)`), like the Cognitive3D replay viewer. `coord="native"` keeps the raw values.
+- **Lidar and boundary in full** — a frame holds only the latest scan, so every scan is also kept in `c3d/sessions/<session_id>/`: `lidar/<sensor>/scans.npz` (all laserscans), one `.npz` per point cloud (`points`, `colors`, `pose`; listed in `index.json`), and `boundary.json` (poses and polygons). Points are sensor-local: `world = rotate(pose.q, point) + pose.p`; `c3d/download.json` gives each laserscan's beam angles and the formula for its points.
+- **Streamed** — camera frames and lidar scans arrive as a few paged streams rather than one request each; deployments without the stream routes fall back to per-item requests (`camera_transport` / `lidar_transport`).
+- **Resumable** — camera frames and lidar scans are cached in `~/.cache/cognitive3dpy` (or `C3D_CACHE_DIR`); an interrupted download resumes and re-runs reuse them.
+- **Other options** — `streams`, `sensors`, `head_rotation`, `task`, `fps`, `repo_id`; see `help(session_downloader.download)`. `session_downloader.inspect(session_id)` lists what a session contains, and `session_downloader.validate(path)` re-checks a dataset.
+
 ## Configuration
+
+### API host
+
+Requests go to `https://api.cognitive3d.com`. To use another environment, set `C3D_BASE_URL` before the first API call:
+
+```bash
+export C3D_BASE_URL=https://api.c3ddev.com
+```
 
 ### Timeout
 
@@ -192,7 +247,7 @@ All data-fetching functions support these session filters:
 ```bash
 git clone https://github.com/CognitiveVR/cognitive3dpy.git
 cd cognitive3dpy
-uv sync --all-extras  # installs package + dev + pandas dependencies
+uv sync --all-groups --extra pandas  # installs package + dev + pandas dependencies
 uv run pytest tests/  # run tests
 ```
 

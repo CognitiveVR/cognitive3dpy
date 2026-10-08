@@ -4,12 +4,18 @@ from importlib.metadata import version
 
 __version__ = version("cognitive3dpy")
 
+from cognitive3dpy import session_downloader
 from cognitive3dpy._client import (
     C3DAPIError,
     C3DAuthError,
     C3DError,
     C3DNotFoundError,
     c3d_set_timeout,
+)
+from cognitive3dpy._lerobot.errors import (
+    C3DDatasetError,
+    C3DIncompleteDownloadError,
+    C3DRetentionError,
 )
 from cognitive3dpy.auth import c3d_auth, c3d_project
 from cognitive3dpy.events import c3d_events
@@ -29,6 +35,8 @@ __all__ = [
     "c3d_objective_results",
     "c3d_session_objectives",
     "c3d_exitpoll",
+    # LeRobot datasets (needs the lerobot extra)
+    "session_downloader",
     # Config
     "c3d_set_timeout",
     # Utilities
@@ -38,4 +46,7 @@ __all__ = [
     "C3DAuthError",
     "C3DNotFoundError",
     "C3DAPIError",
+    "C3DRetentionError",
+    "C3DDatasetError",
+    "C3DIncompleteDownloadError",
 ]
