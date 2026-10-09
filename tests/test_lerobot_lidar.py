@@ -14,15 +14,15 @@ from lerobot_fakes import (
 )
 
 from cognitive3dpy._client import C3DNotFoundError, get_base_url
-from cognitive3dpy._lerobot.camera import MediaCache, StreamUnavailable
-from cognitive3dpy._lerobot.http import HttpClient
-from cognitive3dpy._lerobot.lidar import (
+from cognitive3dpy._export.camera import MediaCache, StreamUnavailable
+from cognitive3dpy._export.http import HttpClient
+from cognitive3dpy._export.lidar import (
     LidarDecodeError,
     LidarDownloader,
     decode_laserscan,
     decode_pointcloud,
 )
-from cognitive3dpy._lerobot.mapping import (
+from cognitive3dpy._export.mapping import (
     BOUNDARY_POSE_KEY,
     BOUNDARY_SHAPE_KEY,
     MappingOptions,
@@ -31,9 +31,9 @@ from cognitive3dpy._lerobot.mapping import (
     build_layout,
     lidar_key,
 )
-from cognitive3dpy._lerobot.models import LidarScanRef
-from cognitive3dpy._lerobot.sessions import fetch_session, parse_session
-from cognitive3dpy._lerobot.sidecar import write_session_sidecar
+from cognitive3dpy._export.models import LidarScanRef
+from cognitive3dpy._export.sessions import fetch_session, parse_session
+from cognitive3dpy._export.sidecar import write_session_sidecar
 
 
 def laserscan_ref(count=4, intensities=False):

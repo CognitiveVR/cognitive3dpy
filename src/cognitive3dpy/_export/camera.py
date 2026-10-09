@@ -18,10 +18,10 @@ from pathlib import Path
 import httpx
 
 from cognitive3dpy._client import C3DAPIError, C3DNotFoundError
-from cognitive3dpy._lerobot.errors import C3DIncompleteDownloadError
-from cognitive3dpy._lerobot.http import HttpClient, segment
-from cognitive3dpy._lerobot.models import CameraFrameRef
-from cognitive3dpy._lerobot.progress import format_bytes, progress_bar
+from cognitive3dpy._export.errors import C3DIncompleteDownloadError
+from cognitive3dpy._export.http import HttpClient, segment
+from cognitive3dpy._export.models import CameraFrameRef
+from cognitive3dpy._export.progress import format_bytes, progress_bar
 
 TRANSPORTS = ("auto", "stream", "per-frame")
 _MEMBER_NAME = re.compile(r"(?:^|/)(\d+)_(-?\d+)\.([A-Za-z0-9]+)$")

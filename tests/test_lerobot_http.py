@@ -5,8 +5,8 @@ import pytest
 import respx
 
 from cognitive3dpy._client import C3DAPIError, C3DAuthError, C3DNotFoundError
-from cognitive3dpy._lerobot.errors import C3DRetentionError
-from cognitive3dpy._lerobot.http import HttpClient, redact_key
+from cognitive3dpy._export.errors import C3DRetentionError
+from cognitive3dpy._export.http import HttpClient, redact_key
 
 KEY = "orgkey-VerySecretKeyValue4321"
 BASE = "https://fake.test"

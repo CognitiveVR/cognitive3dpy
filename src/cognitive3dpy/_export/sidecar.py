@@ -1,38 +1,116 @@
 """Per-session files next to the dataset (``c3d/sessions/<session_id>/``).
 
-LeRobot features need a fixed shape, so whatever does not fit one is kept here,
-lossless: every lidar scan (frames only hold the latest one at each step), each
-point cloud, the boundary polygons and the events with their properties. All of
-it is in the dataset's coordinate convention.
+Frame-based features need a fixed shape, so whatever does not fit one is kept
+here, lossless: every lidar scan (frames only hold the latest one at each step),
+each point cloud, the boundary polygons and the events with their properties. All
+of it is in the dataset's coordinate convention.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import shutil
 import warnings
 from pathlib import Path
 
 import numpy as np
 
-from cognitive3dpy._lerobot.coords import coord_info, mirror_poses, mirror_positions
-from cognitive3dpy._lerobot.lidar import LidarDecodeError, decode_pointcloud
-from cognitive3dpy._lerobot.mapping import (
+from cognitive3dpy._export.coords import (
+    convert_poses,
+    convert_positions,
+    convert_scan_poses,
+    coord_info,
+)
+from cognitive3dpy._export.lidar import LidarDecodeError, decode_pointcloud
+from cognitive3dpy._export.mapping import (
+    CacheFor,
     DatasetLayout,
     EpisodePlan,
     SessionCaches,
     _feature_name,
     laserscan_values,
 )
-from cognitive3dpy._lerobot.progress import progress_bar
+from cognitive3dpy._export.progress import progress_bar
+
+SIDECAR_DIR = "c3d"
+
+
+@contextlib.contextmanager
+def staged(root: Path):
+    """Yields ``<root>.partial`` to write into, then moves it to ``root`` on
+    success, so an interrupted run never leaves output that looks complete. An
+    existing ``root`` keeps its files except those the new output replaces."""
+    partial = root.with_name(root.name + ".partial")
+    if partial.exists():
+        shutil.rmtree(partial)
+    partial.mkdir(parents=True)
+    yield partial
+    if root.exists():
+        merge_into(partial, root)
+        shutil.rmtree(partial)
+    else:
+        partial.rename(root)
+
+
+def merge_into(source: Path, target: Path) -> None:
+    """Move every file under ``source`` to the same place under ``target``,
+    replacing what is there."""
+    for directory, _, files in os.walk(source):
+        relative = Path(directory).relative_to(source)
+        destination = target / relative
+        if destination.exists() and not destination.is_dir():
+            destination.unlink()
+        destination.mkdir(parents=True, exist_ok=True)
+        for name in files:
+            existing = destination / name
+            if existing.is_dir() and not existing.is_symlink():
+                shutil.rmtree(existing)
+            os.replace(Path(directory) / name, existing)
+
+
+def write_manifest(base: Path, manifest: dict) -> None:
+    """``c3d/download.json``: where the data came from and how it was converted."""
+    (base / SIDECAR_DIR).mkdir(parents=True, exist_ok=True)
+    (base / SIDECAR_DIR / "download.json").write_text(json.dumps(manifest, indent=2))
+
+
+def write_sidecars(
+    base: Path,
+    plans: list[EpisodePlan],
+    layout: DatasetLayout,
+    cache_for: CacheFor,
+    coord: str,
+    manifest: dict,
+    *,
+    progress: bool = True,
+) -> None:
+    """Every session's files and the manifest; ``manifest["episodes"]`` lines up
+    with ``plans`` and gains each episode's file list."""
+    sessions_dir = base / SIDECAR_DIR / "sessions"
+    for episode, plan in zip(manifest.get("episodes", []), plans):
+        session_dir = sessions_dir / safe_name(plan.session.session_id)
+        episode["sidecar"] = write_session_sidecar(
+            session_dir,
+            plan,
+            layout,
+            cache_for(plan.session),
+            coord,
+            progress=progress,
+        )
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    write_manifest(base, manifest)
 
 
 def safe_name(value: str) -> str:
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in value)
 
 
-def _pose(values, mirror: bool) -> np.ndarray:
+def _pose(values, coord: str, *, scan: bool = False) -> np.ndarray:
     pose = np.array(values if len(values) == 7 else (np.nan,) * 7, dtype=np.float64)
-    return (mirror_poses(pose) if mirror else pose).astype(np.float32)
+    convert = convert_scan_poses if scan else convert_poses
+    return convert(pose, coord).astype(np.float32)
 
 
 def write_session_sidecar(
@@ -46,7 +124,6 @@ def write_session_sidecar(
 ) -> dict:
     """Write one session's files; returns what was written, for download.json."""
     session = plan.session
-    mirror = coord == "rh_yup"
     system = coord_info(coord)
     session_dir.mkdir(parents=True, exist_ok=True)
     summary: dict = {}
@@ -54,8 +131,8 @@ def write_session_sidecar(
     events = []
     for e in session.events:
         point = e.point
-        if point is not None and mirror:
-            point = mirror_positions(np.array(point)).tolist()
+        if point is not None:
+            point = convert_positions(np.array(point), coord).tolist()
         events.append(
             {
                 "name": e.name,
@@ -74,11 +151,11 @@ def write_session_sidecar(
         refs = session.lidar[sensor_id]
         if lidar.kind == "laserscan":
             summary[sensor_id] = _write_laserscans(
-                sensor_dir, refs, lidar, caches, mirror
+                sensor_dir, refs, lidar, caches, coord
             )
         else:
             summary[sensor_id] = _write_pointclouds(
-                sensor_dir, refs, caches, mirror, system, session.session_id, progress
+                sensor_dir, refs, caches, coord, system, session.session_id, progress
             )
         summary[sensor_id]["kind"] = lidar.kind
 
@@ -88,14 +165,14 @@ def write_session_sidecar(
             {
                 "index": i,
                 "time": float(t),
-                "points": (mirror_positions(points) if mirror else points).tolist(),
+                "points": convert_positions(points, coord).tolist(),
             }
             for i, (t, points) in enumerate(zip(boundary.shape_times, boundary.shapes))
         ]
         document = {
             "coordinate_system": system,
             "poses": [
-                {"time": float(t), "pose": _pose(p, mirror).tolist()}
+                {"time": float(t), "pose": _pose(p, coord).tolist()}
                 for t, p in zip(boundary.times, boundary.poses)
             ],
             "shapes": shapes,
@@ -106,7 +183,7 @@ def write_session_sidecar(
     return summary
 
 
-def _write_laserscans(sensor_dir, refs, lidar, caches, mirror) -> dict:
+def _write_laserscans(sensor_dir, refs, lidar, caches, coord) -> dict:
     count = lidar.range_count
     ranges = np.full((len(refs), count), np.nan, dtype=np.float32)
     intensities = np.full((len(refs), count), np.nan, dtype=np.float32)
@@ -125,7 +202,7 @@ def _write_laserscans(sensor_dir, refs, lidar, caches, mirror) -> dict:
         "time": np.array([r.time for r in refs], dtype=np.float64),
         "date": np.array([r.date for r in refs], dtype=np.int64),
         "seq": np.array([r.seq for r in refs], dtype=np.int64),
-        "pose": np.stack([_pose(r.pose, mirror) for r in refs]),
+        "pose": np.stack([_pose(r.pose, coord, scan=True) for r in refs]),
         "ranges": ranges,
         "angle_min": np.float64(lidar.angle_min),
         "angle_increment": np.float64(lidar.angle_increment),
@@ -138,7 +215,7 @@ def _write_laserscans(sensor_dir, refs, lidar, caches, mirror) -> dict:
     return {"scans": len(refs), "skipped": skipped, "file": "scans.npz"}
 
 
-def _write_pointclouds(sensor_dir, refs, caches, mirror, system, session_id, progress):
+def _write_pointclouds(sensor_dir, refs, caches, coord, system, session_id, progress):
     index = []
     skipped = 0
     desc = f"Writing {session_id} lidar {sensor_dir.name} point clouds"
@@ -158,10 +235,11 @@ def _write_pointclouds(sensor_dir, refs, caches, mirror, system, session_id, pro
             try:
                 if ref.point_count > 0:
                     cloud = decode_pointcloud(caches.lidar.read(ref), ref)
-                    points = cloud.positions
-                    if mirror:
-                        points = mirror_positions(points).astype(np.float32)
-                    arrays = {"points": points, "pose": _pose(ref.pose, mirror)}
+                    points = convert_positions(cloud.positions, coord)
+                    arrays = {
+                        "points": points.astype(np.float32),
+                        "pose": _pose(ref.pose, coord),
+                    }
                     if cloud.colors is not None:
                         arrays["colors"] = cloud.colors
                     if cloud.intensities is not None:

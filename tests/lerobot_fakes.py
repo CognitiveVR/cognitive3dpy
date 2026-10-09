@@ -9,6 +9,7 @@ import io
 import json
 import re
 import tarfile
+import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
 from urllib.parse import unquote
@@ -245,6 +246,38 @@ def make_session(
     return FakeSession(project_id, session_id, start, docs, frames, lidar_blobs)
 
 
+EXPORT_TYPES = ("GAZE", "FIXATION", "EVENTS", "DYNAMICS", "SENSORS", "BOUNDARY")
+
+
+def export_document(doc: dict) -> dict:
+    """A section as the dashboard export has it: rows in one list, no versionId,
+    times in epoch seconds."""
+    start = doc["timestamp"]
+    out = {k: v for k, v in doc.items() if k not in ("data", "shapes")}
+    out["data"] = []
+    for rows in doc["data"].values():
+        for row in rows:
+            row = {k: v for k, v in row.items() if k != "versionId"}
+            if "time" in row:
+                row["time"] = round(start + row["time"], 3)
+            out["data"].append(row)
+    return out
+
+
+def export_zip(session) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for json_type in EXPORT_TYPES:
+            if json_type in session.docs:
+                name = f"{json_type.lower()}_{session.session_id}.json"
+                archive.writestr(name, export_entry(session, json_type))
+    return buffer.getvalue()
+
+
+def export_entry(session, json_type: str) -> bytes:
+    return json.dumps(export_document(session.docs[json_type])).encode()
+
+
 def tar_page(entries: list) -> bytes:
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w", format=tarfile.USTAR_FORMAT) as tar:
@@ -285,6 +318,7 @@ class FakeEdge:
             return httpx.Response(queued.pop(0), headers={"Retry-After": "0"})
         handler = {
             "json": self._json,
+            "export": self._export,
             "stream": self._stream,
             "frame": self._frame,
             "lidar": self._lidar,
@@ -298,6 +332,8 @@ class FakeEdge:
     def _kind(path: str) -> str:
         if path.endswith("/jsonRequests"):
             return "json"
+        if path.endswith("/jsonZipRequest"):
+            return "export"
         if "/lidarScans/" in path and path.endswith("/stream"):
             return "lidar_stream"
         if path.endswith("/stream"):
@@ -317,6 +353,14 @@ class FakeEdge:
         if doc is None:
             return httpx.Response(404, text="No data found for the requested json file")
         return httpx.Response(200, json=doc)
+
+    def _export(self, request, path):
+        m = re.match(r"^/v0/projects/(\d+)/sessions/([^/]+)/jsonZipRequest$", path)
+        session = self.sessions.get((int(m.group(1)), unquote(m.group(2))))
+        if session is None:
+            return httpx.Response(404)
+        headers = {"Content-Type": "application/zip"}
+        return httpx.Response(200, content=export_zip(session), headers=headers)
 
     def _stream(self, request, path):
         if not self.stream_available:

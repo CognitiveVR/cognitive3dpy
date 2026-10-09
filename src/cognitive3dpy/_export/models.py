@@ -80,6 +80,9 @@ class LidarScanRef:
     angle_increment: float = 0.0  # laserscan, radians
     range_min: float = 0.0  # laserscan, metres
     range_max: float = float("inf")  # laserscan, metres
+    angle_max: float | None = None  # laserscan, radians
+    time_increment: float = 0.0  # laserscan, seconds between beams
+    scan_time: float = 0.0  # laserscan, seconds between scans
     point_count: int = 0  # pointcloud
     position_format: str = ""  # pointcloud: int16_mm | float32
     color_format: str = "none"  # pointcloud: none | rgb565 | rgb332 | rgb888
@@ -124,6 +127,8 @@ class SessionData:
     cameras: dict[str, list[CameraFrameRef]] = field(default_factory=dict)
     lidar: dict[str, list[LidarScanRef]] = field(default_factory=dict)
     boundary: BoundaryData | None = None
+    properties: dict = field(default_factory=dict)
+    raw: dict[str, bytes] = field(default_factory=dict)  # section -> response body
 
     @property
     def streams(self) -> set[str]:

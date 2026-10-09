@@ -19,8 +19,8 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from cognitive3dpy._client import C3DAPIError, C3DAuthError, C3DNotFoundError
-from cognitive3dpy._lerobot.errors import C3DRetentionError
-from cognitive3dpy._lerobot.progress import progress_bar
+from cognitive3dpy._export.errors import C3DRetentionError
+from cognitive3dpy._export.progress import progress_bar
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,8 @@ import pytest
 from lerobot_fakes import make_session
 
 from cognitive3dpy._client import C3DNotFoundError, get_base_url
-from cognitive3dpy._lerobot.http import HttpClient
-from cognitive3dpy._lerobot.sessions import fetch_session, parse_session
+from cognitive3dpy._export.http import HttpClient
+from cognitive3dpy._export.sessions import fetch_session, parse_session
 
 
 def docs_of(fake):

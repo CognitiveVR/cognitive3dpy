@@ -20,16 +20,16 @@ from itertools import groupby
 
 import numpy as np
 
-from cognitive3dpy._lerobot.camera import (
+from cognitive3dpy._export.camera import (
     MediaCache,
     StreamUnavailable,
     fetch_each,
     stream_into_cache,
 )
-from cognitive3dpy._lerobot.errors import C3DIncompleteDownloadError
-from cognitive3dpy._lerobot.http import HttpClient, segment
-from cognitive3dpy._lerobot.models import LidarScanRef
-from cognitive3dpy._lerobot.progress import format_bytes, progress_bar
+from cognitive3dpy._export.errors import C3DIncompleteDownloadError
+from cognitive3dpy._export.http import HttpClient, segment
+from cognitive3dpy._export.models import LidarScanRef
+from cognitive3dpy._export.progress import format_bytes, progress_bar
 
 TRANSPORTS = ("auto", "stream", "per-scan")
 POSITION_BYTES = {"int16_mm": 2, "float32": 4}

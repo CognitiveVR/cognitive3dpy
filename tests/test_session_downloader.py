@@ -28,7 +28,7 @@ def scalar(value):
 
 @pytest.fixture
 def no_sleep():
-    with patch("cognitive3dpy._lerobot.http.time.sleep"):
+    with patch("cognitive3dpy._export.http.time.sleep"):
         yield
 
 
@@ -39,6 +39,7 @@ def fake(edge):
 
 def download(tmp_path, fake, **kwargs):
     kwargs.setdefault("output", tmp_path / "leRobot")
+    kwargs.setdefault("format", "lerobot")
     kwargs.setdefault("cache_dir", tmp_path / "cache")
     kwargs.setdefault("progress", False)
     return session_downloader.download(session_id=fake.session_id, **kwargs)
@@ -77,7 +78,7 @@ def test_install_hint_when_the_extra_is_missing(tmp_path, monkeypatch):
         lambda name, *a: None if name == "lerobot" else real(name, *a),
     )
     with pytest.raises(ImportError, match=r"cognitive3dpy\[lerobot\]"):
-        session_downloader.download(session_id="s", output=tmp_path)
+        session_downloader.download(session_id="s", output=tmp_path, format="lerobot")
 
 
 def test_base_url_override(monkeypatch):
@@ -89,7 +90,7 @@ def test_base_url_override(monkeypatch):
 
 
 def test_default_repo_id_is_the_session_id():
-    from cognitive3dpy._lerobot.download import default_repo_id
+    from cognitive3dpy._export.download import default_repo_id
 
     assert default_repo_id(["1790083950_tb4-sim"]) == "cognitive3d/1790083950_tb4-sim"
     assert default_repo_id(["a b/c"]) == "cognitive3d/a_b_c"
@@ -102,7 +103,10 @@ def test_default_repo_id_is_the_session_id():
 def test_default_output_is_datasets_cognitive3d_session_id(tmp_path, fake, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = session_downloader.download(
-        session_id=fake.session_id, cache_dir=tmp_path / "cache", progress=False
+        session_id=fake.session_id,
+        format="lerobot",
+        cache_dir=tmp_path / "cache",
+        progress=False,
     )
     expected = tmp_path / "datasets" / "cognitive3d" / fake.session_id
     assert result.path == expected.resolve()
@@ -170,7 +174,12 @@ def test_per_frame_fallback_with_an_auth_outage(tmp_path, fake, edge, no_sleep):
 def test_several_sessions_become_episodes(tmp_path, edge):
     a = edge.add(make_session("a", duration=6.0))
     b = edge.add(make_session("b", duration=4.0))
-    common = {"output": tmp_path / "o", "cache_dir": tmp_path / "c", "progress": False}
+    common = {
+        "output": tmp_path / "o",
+        "cache_dir": tmp_path / "c",
+        "progress": False,
+        "format": "lerobot",
+    }
     with pytest.raises(ValueError, match="repo_id is required"):
         session_downloader.download(session_id=["a", "b"], **common)
     result = session_downloader.download(
@@ -192,7 +201,7 @@ def test_progress_output(tmp_path, fake, capsys):
 def test_unknown_session(tmp_path, edge):
     with pytest.raises(c3d.C3DNotFoundError, match="not found or has no data yet"):
         session_downloader.download(
-            session_id="missing", output=tmp_path, progress=False
+            session_id="missing", output=tmp_path, progress=False, format="lerobot"
         )
 
 

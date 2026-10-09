@@ -40,8 +40,8 @@ def live_api(monkeypatch):
 
 def test_live_download(live_api, tmp_path):
     from cognitive3dpy._client import get_base_url
-    from cognitive3dpy._lerobot.http import HttpClient
-    from cognitive3dpy._lerobot.sessions import fetch_session
+    from cognitive3dpy._export.http import HttpClient
+    from cognitive3dpy._export.sessions import fetch_session
 
     summary = session_downloader.inspect(SESSION_ID, project_id=PROJECT_ID)
     camera_id, camera = next(iter(summary["cameras"].items()))

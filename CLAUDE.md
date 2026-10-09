@@ -8,7 +8,7 @@ The project uses `uv`. To set up:
 uv sync --all-groups --extra pandas
 ```
 
-This installs the package, all dev dependencies, and the optional pandas extra. The `pandas` and `lerobot` extras are declared conflicting (lerobot 0.6 pins pandas<3), so `--all-extras` does not resolve; use `--extra lerobot` on Python 3.12+ to work on `session_downloader`. Without lerobot its end-to-end tests skip.
+This installs the package, all dev dependencies, and the optional pandas extra. The `pandas` and `lerobot` extras are declared conflicting (lerobot 0.6 pins pandas<3), so `--all-extras` does not resolve; use `--extra lerobot` on Python 3.12+ to work on `session_downloader`. Without lerobot its LeRobot end-to-end tests skip; the MCAP, HDF5, RLDS and JSON formats only need the dev group.
 
 ## Running tests
 
@@ -35,7 +35,7 @@ API JSON → pl.DataFrame → normalize_columns() → coerce_types() → [join_s
 - `_lookups.py` — metadata resolution (scenes, objects, objectives); results are cached by project_id
 - `_filters.py` — builds the session filter payload sent to the API
 - Each public function lives in its own module (`sessions.py`, `events.py`, etc.)
-- `session_downloader.py` — sessions → LeRobot datasets; the engine is `_lerobot/` (numpy/Pillow/lerobot, imported lazily so the base package never needs them)
+- `session_downloader.py` — sessions → LeRobot, MCAP, HDF5, RLDS or raw JSON datasets; the engine is `_export/` (numpy/Pillow and each format's library, imported lazily so the base package never needs them)
 
 ## Key conventions
 

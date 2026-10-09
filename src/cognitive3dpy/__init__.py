@@ -12,7 +12,7 @@ from cognitive3dpy._client import (
     C3DNotFoundError,
     c3d_set_timeout,
 )
-from cognitive3dpy._lerobot.errors import (
+from cognitive3dpy._export.errors import (
     C3DDatasetError,
     C3DIncompleteDownloadError,
     C3DRetentionError,

@@ -1,17 +1,21 @@
-"""Tests for _lerobot/mapping.py, coords.py and timeline.py (no lerobot needed)."""
+"""Tests for _export/mapping.py, coords.py and timeline.py (no lerobot needed)."""
 
 import numpy as np
 import pytest
 from lerobot_fakes import make_session
 
-from cognitive3dpy._lerobot.coords import (
+from cognitive3dpy._export.coords import (
+    LASERSCAN_BEAM,
+    convert_poses,
+    convert_positions,
+    convert_quaternions,
+    convert_scan_poses,
     coord_info,
-    mirror_poses,
-    mirror_positions,
-    mirror_quaternions,
+    quaternion_multiply,
+    rotate,
 )
-from cognitive3dpy._lerobot.errors import C3DDatasetError
-from cognitive3dpy._lerobot.mapping import (
+from cognitive3dpy._export.errors import C3DDatasetError
+from cognitive3dpy._export.mapping import (
     EVENT_KEY,
     GAZE_KEY,
     SENSORS_KEY,
@@ -24,8 +28,8 @@ from cognitive3dpy._lerobot.mapping import (
     camera_feature_key,
     camera_pose_key,
 )
-from cognitive3dpy._lerobot.sessions import parse_session
-from cognitive3dpy._lerobot.timeline import (
+from cognitive3dpy._export.sessions import parse_session
+from cognitive3dpy._export.timeline import (
     derive_fps,
     event_index_per_frame,
     hold_indices,
@@ -72,32 +76,116 @@ def quat_rotate(q, v):
     return 2 * np.dot(u, v) * u + (w * w - np.dot(u, u)) * v + 2 * w * np.cross(u, v)
 
 
+def unit_quaternions(n, seed=1):
+    q = np.random.default_rng(seed).normal(size=(n, 4))
+    return q / np.linalg.norm(q, axis=1, keepdims=True)
+
+
+def test_rotate_matches_the_quaternion_sandwich():
+    q = unit_quaternions(50)
+    v = np.random.default_rng(2).normal(size=(50, 3))
+    for qi, vi, ri in zip(q, v, rotate(q, v)):
+        assert np.allclose(ri, quat_rotate(qi, vi), atol=1e-12)
+
+
+def test_quaternion_multiply_composes_rotations():
+    a, b = unit_quaternions(20, 3), unit_quaternions(20, 4)
+    v = np.random.default_rng(5).normal(size=(20, 3))
+    assert np.allclose(
+        rotate(quaternion_multiply(a, b), v), rotate(a, rotate(b, v)), atol=1e-12
+    )
+
+
 def test_mirror_is_an_involution_and_commutes_with_rotation():
-    rng = np.random.default_rng(1)
-    q = rng.normal(size=(200, 4))
-    q /= np.linalg.norm(q, axis=1, keepdims=True)
-    v = rng.normal(size=(200, 3))
-    assert np.allclose(mirror_positions(mirror_positions(v)), v)
-    assert np.allclose(mirror_quaternions(mirror_quaternions(q)), q)
-    for qi, vi in zip(q, v):
-        left = quat_rotate(mirror_quaternions(qi), mirror_positions(vi))
-        assert np.allclose(left, mirror_positions(quat_rotate(qi, vi)), atol=1e-12)
+    q = unit_quaternions(200)
+    v = np.random.default_rng(1).normal(size=(200, 3))
+    assert np.allclose(convert_positions(convert_positions(v, "rh_yup"), "rh_yup"), v)
+    assert np.allclose(
+        convert_quaternions(convert_quaternions(q, "rh_yup"), "rh_yup"), q
+    )
+    left = rotate(convert_quaternions(q, "rh_yup"), convert_positions(v, "rh_yup"))
+    assert np.allclose(left, convert_positions(rotate(q, v), "rh_yup"), atol=1e-12)
 
 
 def test_mirror_flips_handedness():
-    mx, my, mz = mirror_positions(np.eye(3))
+    mx, my, mz = convert_positions(np.eye(3), "rh_yup")
     assert np.allclose(np.cross(mx, my), -mz)
 
 
 def test_matches_the_replay_viewer_convert_pose():
     # cvr-session-replay convertPose: position [-x, y, z], rotation [qx, -qy, -qz, qw]
     pose = np.array([1.0, 2.0, 3.0, 0.1, 0.2, 0.3, 0.9])
-    assert np.allclose(mirror_poses(pose), [-1.0, 2.0, 3.0, 0.1, -0.2, -0.3, 0.9])
+    expected = [-1.0, 2.0, 3.0, 0.1, -0.2, -0.3, 0.9]
+    assert np.allclose(convert_poses(pose, "rh_yup"), expected)
+
+
+@pytest.mark.parametrize("coord", ["rh_yup", "ros", "native"])
+def test_every_conversion_commutes_with_rotation(coord):
+    q = unit_quaternions(200, 7)
+    v = np.random.default_rng(8).normal(size=(200, 3))
+    converted = convert_quaternions(q, coord)
+    assert np.allclose(np.linalg.norm(converted, axis=1), 1.0)
+    left = rotate(converted, convert_positions(v, coord))
+    assert np.allclose(left, convert_positions(rotate(q, v), coord), atol=1e-12)
+
+
+def test_ros_axes_are_forward_left_up():
+    # recorded: x right, y up, z forward
+    right, up, forward = np.eye(3)
+    assert np.allclose(convert_positions(forward, "ros"), [1, 0, 0])
+    assert np.allclose(convert_positions(-right, "ros"), [0, 1, 0])
+    assert np.allclose(convert_positions(up, "ros"), [0, 0, 1])
+    x, y, z = convert_positions(np.eye(3), "ros")
+    assert np.allclose(np.cross(x, y), -z)  # left-handed in, right-handed out
+
+
+def test_a_yaw_about_up_stays_a_yaw_about_up():
+    half = np.sqrt(0.5)
+    yaw_90 = np.array([0.0, half, 0.0, half])  # recorded: 90 degrees about +y
+    ros = convert_quaternions(yaw_90, "ros")
+    assert np.allclose(ros[:2], 0.0) and abs(abs(ros[2]) - half) < 1e-12
+
+
+@pytest.mark.parametrize("coord", ["rh_yup", "ros", "native"])
+def test_scan_poses_follow_the_documented_beam(coord):
+    q = unit_quaternions(50, 9)
+    p = np.random.default_rng(10).normal(size=(50, 3))
+    theta = np.linspace(-3, 3, 50)
+    r = np.linspace(0.2, 9, 50)
+    local = np.stack([r * np.cos(theta), r * np.sin(theta), np.zeros(50)], axis=1)
+    world = convert_positions(rotate(q, local) + p, coord)
+
+    pose = convert_scan_poses(np.concatenate([p, q], axis=1), coord)
+    beam = {
+        "(r cos θ, r sin θ, 0)": local,
+        "(-r cos θ, r sin θ, 0)": local * [-1, 1, 1],
+    }[LASERSCAN_BEAM[coord]]
+    assert np.allclose(rotate(pose[:, 3:], beam) + pose[:, :3], world, atol=1e-12)
+
+
+def test_ros_poses_of_a_turtlebot4_match_its_urdf():
+    # tb4 sim session, t = 604 s: base pose and rplidar scan pose as recorded
+    head = np.array([-4.0017, 0.0, -13.4531, 0.0, -0.71528, 0.0, 0.69884])
+    scan = np.array(
+        [-3.95703, 0.192915, -13.45207, 0.505758, 0.494175, -0.494175, 0.505758]
+    )
+    base = convert_poses(head, "ros")
+    lidar = convert_scan_poses(scan, "ros")
+    assert abs(lidar[2] - 0.193) < 1e-3  # rplidar_link sits 0.193 m up
+    base_x, base_y = rotate(base[3:], [1, 0, 0]), rotate(base[3:], [0, 1, 0])
+    assert np.allclose(rotate(lidar[3:], [0, 0, 1]), [0, 0, 1], atol=1e-3)
+    # rplidar_link is yawed +90 degrees on the base: its x is the base's y
+    assert np.allclose(rotate(lidar[3:], [1, 0, 0]), base_y, atol=0.05)
+    assert np.allclose(rotate(lidar[3:], [0, 1, 0]), -base_x, atol=0.05)
+    # and mounted 4 cm behind base_link
+    offset = rotate(base[3:] * [-1, -1, -1, 1], lidar[:3] - base[:3])
+    assert np.allclose(offset, [-0.04, 0.0, 0.193], atol=0.01)
 
 
 def test_coord_info():
     assert coord_info("rh_yup")["mirror"] == "x"
     assert coord_info("native")["mirror"] is None
+    assert coord_info("ros")["up"] == "+z"
     with pytest.raises(ValueError):
         coord_info("zup")
 

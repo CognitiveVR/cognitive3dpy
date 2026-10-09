@@ -11,16 +11,17 @@ from dataclasses import dataclass, field
 import numpy as np
 from PIL import Image
 
-from cognitive3dpy._lerobot.camera import MediaCache
-from cognitive3dpy._lerobot.coords import (
-    mirror_poses,
-    mirror_positions,
-    mirror_quaternions,
+from cognitive3dpy._export.camera import MediaCache
+from cognitive3dpy._export.coords import (
+    convert_poses,
+    convert_positions,
+    convert_quaternions,
+    convert_scan_poses,
 )
-from cognitive3dpy._lerobot.errors import C3DDatasetError
-from cognitive3dpy._lerobot.lidar import LidarDecodeError, decode_laserscan
-from cognitive3dpy._lerobot.models import CameraFrameRef, SessionData
-from cognitive3dpy._lerobot.timeline import (
+from cognitive3dpy._export.errors import C3DDatasetError
+from cognitive3dpy._export.lidar import LidarDecodeError, decode_laserscan
+from cognitive3dpy._export.models import CameraFrameRef, SessionData
+from cognitive3dpy._export.timeline import (
     derive_fps,
     event_index_per_frame,
     hold_indices,
@@ -63,6 +64,26 @@ def camera_feature_key(camera_id: str) -> str:
 
 def camera_pose_key(camera_id: str) -> str:
     return f"observation.camera.{_feature_name(camera_id)}.pose"
+
+
+def obs_name(feature_key: str) -> str:
+    """A feature's name without the LeRobot prefix, for formats with flat
+    observation keys: ``observation.images.front`` -> ``front_image``,
+    ``observation.lidar.scan.ranges`` -> ``lidar_scan_ranges``."""
+    parts = feature_key.split(".")[1:]
+    if parts[0] == "images":
+        return f"{parts[1]}_image"
+    if parts[0] == "camera":
+        return f"{parts[1]}_pose"
+    return "_".join(parts)
+
+
+def next_state_actions(states: np.ndarray) -> np.ndarray:
+    """Actions for formats that need one: the next step's state (the last step
+    keeps its own), i.e. the pose the head moves to."""
+    if len(states) == 0:
+        return states.copy()
+    return np.concatenate([states[1:], states[-1:]]).astype(states.dtype)
 
 
 @dataclass
@@ -353,27 +374,22 @@ def build_episode(
     from the downloaded blobs)."""
     kind, arg = layout.clock
     times = _clock_times(session, kind, arg, layout.fps if kind == "fixed" else None)
-    mirror = options.coord == "rh_yup"
+    coord = options.coord
     numeric: dict[str, np.ndarray] = {}
 
     gaze = session.gaze
     head = sample_and_hold(gaze.times, gaze.positions, times, before_first="clamp")
-    if mirror:
-        head = mirror_positions(head)
+    head = convert_positions(head, coord)
     if options.head_rotation:
         rotation = sample_and_hold(
             gaze.times, gaze.rotations, times, before_first="clamp"
         )
-        if mirror:
-            rotation = mirror_quaternions(rotation)
-        head = np.concatenate([head, rotation], axis=1)
+        head = np.concatenate([head, convert_quaternions(rotation, coord)], axis=1)
     numeric[STATE_KEY] = head.astype(np.float32)
 
     if GAZE_KEY in layout.features:
         points = sample_and_hold(gaze.times, gaze.gaze_points, times)
-        numeric[GAZE_KEY] = (mirror_positions(points) if mirror else points).astype(
-            np.float32
-        )
+        numeric[GAZE_KEY] = convert_positions(points, coord).astype(np.float32)
 
     if SENSORS_KEY in layout.features:
         columns = []
@@ -406,9 +422,9 @@ def build_episode(
             [r.pose if len(r.pose) == 7 else (np.nan,) * 7 for r in frame_refs],
             dtype=np.float64,
         )
-        numeric[camera_pose_key(camera_id)] = (
-            mirror_poses(poses) if mirror else poses
-        ).astype(np.float32)
+        numeric[camera_pose_key(camera_id)] = convert_poses(poses, coord).astype(
+            np.float32
+        )
 
     skipped: dict[str, int] = {}
     for sensor_id, lidar in layout.lidar.items():
@@ -420,9 +436,8 @@ def build_episode(
         poses[held] = [
             refs[i].pose if len(refs[i].pose) == 7 else (np.nan,) * 7 for i in idx[held]
         ]
-        numeric[lidar_key(sensor_id, "pose")] = (
-            mirror_poses(poses) if mirror else poses
-        ).astype(np.float32)
+        convert = convert_scan_poses if lidar.kind == "laserscan" else convert_poses
+        numeric[lidar_key(sensor_id, "pose")] = convert(poses, coord).astype(np.float32)
         if lidar.kind == "pointcloud":
             numeric[lidar_key(sensor_id, "scan_index")] = idx.astype(np.int64).reshape(
                 -1, 1
@@ -440,9 +455,7 @@ def build_episode(
     if layout.boundary:
         boundary = session.boundary
         poses = sample_and_hold(boundary.times, boundary.poses, times)
-        numeric[BOUNDARY_POSE_KEY] = (mirror_poses(poses) if mirror else poses).astype(
-            np.float32
-        )
+        numeric[BOUNDARY_POSE_KEY] = convert_poses(poses, coord).astype(np.float32)
         shape_idx = hold_indices(boundary.shape_times, times)
         numeric[BOUNDARY_SHAPE_KEY] = shape_idx.astype(np.int64).reshape(-1, 1)
 

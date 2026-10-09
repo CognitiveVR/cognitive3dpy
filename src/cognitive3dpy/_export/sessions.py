@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import io
 import json
+import zipfile
 from collections.abc import Iterable
 
 import numpy as np
 
 from cognitive3dpy._client import C3DNotFoundError
-from cognitive3dpy._lerobot.http import HttpClient, segment
-from cognitive3dpy._lerobot.models import (
+from cognitive3dpy._export.http import HttpClient, segment
+from cognitive3dpy._export.models import (
     BoundaryData,
     CameraFrameRef,
     GazeSamples,
@@ -27,6 +29,17 @@ SECTION_TYPES = {
     "lidar": "LIDAR",
     "boundary": "BOUNDARY",
 }
+# the dashboard's session export (jsonZipRequest), then the sections it leaves out
+EXPORT_SECTIONS = (
+    "gaze",
+    "fixation",
+    "events",
+    "dynamics",
+    "sensors",
+    "boundary",
+    "space_visits",
+)
+JSON_SECTIONS = (*EXPORT_SECTIONS, "camera", "lidar")
 _ROWS_KEY = {
     "gaze": "data",
     "sensors": "data",
@@ -37,18 +50,19 @@ _ROWS_KEY = {
 }
 
 
-def fetch_section(
+def fetch_section_bytes(
     http: HttpClient,
     project_id: int,
     session_id: str,
     section: str,
     *,
     progress: bool = True,
-) -> dict | None:
-    """One section, or None when the session has none of it (the API answers 404)."""
+) -> bytes | None:
+    """One section's response body, or None when the session has none of it (the
+    API answers 404)."""
     path = f"/v0/projects/{int(project_id)}/sessions/{segment(session_id)}/jsonRequests"
     try:
-        raw = http.request_bytes(
+        return http.request_bytes(
             "POST",
             path,
             json={"jsonType": SECTION_TYPES[section], "addMetadata": True},
@@ -57,7 +71,86 @@ def fetch_section(
         )
     except C3DNotFoundError:
         return None
-    return json.loads(raw)
+
+
+def fetch_section(
+    http: HttpClient,
+    project_id: int,
+    session_id: str,
+    section: str,
+    *,
+    progress: bool = True,
+) -> dict | None:
+    raw = fetch_section_bytes(http, project_id, session_id, section, progress=progress)
+    return None if raw is None else json.loads(raw)
+
+
+def fetch_export(
+    http: HttpClient, project_id: int, session_id: str, *, progress: bool = True
+) -> dict[str, bytes]:
+    """The dashboard's session export, ``<section>_<session_id>.json`` files in a
+    zip (epoch-second times, rows not keyed by scene version): section -> body."""
+    path = (
+        f"/v0/projects/{int(project_id)}/sessions/{segment(session_id)}/jsonZipRequest"
+    )
+    try:
+        raw = http.request_bytes(
+            "GET",
+            path,
+            context=f"JSON export of session {session_id}",
+            progress_desc=f"{session_id} export.zip" if progress else None,
+        )
+    except C3DNotFoundError:
+        return {}
+    suffix = f"_{session_id}.json"
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        return {
+            name[: -len(suffix)] if name.endswith(suffix) else name.rsplit(".", 1)[0]: (
+                archive.read(name)
+            )
+            for name in archive.namelist()
+        }
+
+
+def _not_found(project_id: int, session_id: str) -> C3DNotFoundError:
+    error = C3DNotFoundError(
+        f"Session {session_id} in project {project_id} was not found or has no "
+        "data yet (sessions can take a minute or two to appear after they end)."
+    )
+    error.status, error.body = 404, ""
+    return error
+
+
+def fetch_session_export(
+    http: HttpClient,
+    project_id: int,
+    session_id: str,
+    sections: Iterable[str] = JSON_SECTIONS,
+    *,
+    progress: bool = True,
+) -> SessionData:
+    """The session as JSON documents for the json format: the dashboard export's
+    sections plus camera and lidar from ``jsonRequests``, kept byte for byte on
+    ``SessionData.raw``; only camera and lidar are parsed (for their media)."""
+    sections = list(sections)
+    raw: dict[str, bytes] = {}
+    if any(s in EXPORT_SECTIONS for s in sections):
+        exported = fetch_export(http, project_id, session_id, progress=progress)
+        raw = {name: body for name, body in exported.items() if name in sections}
+    docs = {}
+    for name in ("camera", "lidar"):
+        if name in sections:
+            body = fetch_section_bytes(
+                http, project_id, session_id, name, progress=progress
+            )
+            if body is not None:
+                raw[name] = body
+                docs[name] = json.loads(body)
+    if not raw:
+        raise _not_found(project_id, session_id)
+    session = parse_session(project_id, session_id, docs)
+    session.raw = raw
+    return session
 
 
 def fetch_session(
@@ -73,12 +166,7 @@ def fetch_session(
         for name in sections
     }
     if all(doc is None for doc in fetched.values()):
-        error = C3DNotFoundError(
-            f"Session {session_id} in project {project_id} was not found or has no "
-            "data yet (sessions can take a minute or two to appear after they end)."
-        )
-        error.status, error.body = 404, ""
-        raise error
+        raise _not_found(project_id, session_id)
     return parse_session(project_id, session_id, fetched)
 
 
@@ -214,6 +302,9 @@ def parse_lidar(rows: list[dict]) -> dict[str, list[LidarScanRef]]:
                 angle_increment=float(scan.get("angleIncrement") or 0.0),
                 range_min=float(scan.get("rangeMin") or 0.0),
                 range_max=float(scan.get("rangeMax") or float("inf")),
+                angle_max=_optional_float(scan.get("angleMax")),
+                time_increment=float(scan.get("timeIncrement") or 0.0),
+                scan_time=float(scan.get("scanTime") or 0.0),
                 point_count=int(cloud.get("pointCount") or 0),
                 position_format=str(cloud.get("positionFormat") or ""),
                 color_format=str(cloud.get("colorFormat") or "none"),
@@ -228,6 +319,10 @@ def parse_lidar(rows: list[dict]) -> dict[str, list[LidarScanRef]]:
     for refs in sensors.values():
         refs.sort(key=lambda ref: (ref.time, ref.date, ref.seq))
     return dict(sorted(sensors.items()))
+
+
+def _optional_float(value) -> float | None:
+    return None if value is None else float(value)
 
 
 def parse_boundary(doc: dict | None) -> BoundaryData | None:
@@ -265,6 +360,7 @@ def parse_session(project_id: int, session_id: str, docs: dict) -> SessionData:
         duration=float(header.get("duration") or 0.0),
         format_version=header.get("formatversion"),
         metadata=dict(header.get("metadata") or {}),
+        properties=dict(header.get("properties") or {}),
         gaze=parse_gaze(_rows(docs.get("gaze"), _ROWS_KEY["gaze"])),
         sensors=parse_sensors(_rows(docs.get("sensors"), _ROWS_KEY["sensors"])),
         events=parse_events(_rows(docs.get("events"), _ROWS_KEY["events"])),

@@ -6,14 +6,14 @@ import pytest
 from lerobot_fakes import make_session, tar_page
 
 from cognitive3dpy._client import C3DNotFoundError, get_base_url
-from cognitive3dpy._lerobot.camera import (
+from cognitive3dpy._export.camera import (
     CameraDownloader,
     CameraFrameCache,
     StreamUnavailable,
     read_stream_page,
 )
-from cognitive3dpy._lerobot.http import HttpClient
-from cognitive3dpy._lerobot.sessions import fetch_session
+from cognitive3dpy._export.http import HttpClient
+from cognitive3dpy._export.sessions import fetch_session
 
 FRAME = "front/0000000000100_0000000000"
 
