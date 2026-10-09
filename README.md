@@ -146,7 +146,105 @@ polls = c3d.c3d_exitpoll()
 polls = c3d.c3d_exitpoll(hook="end_questions", version=3)
 ```
 
+## Robotics Datasets
+
+`session_downloader` turns a session into a robot-learning dataset: head pose, gaze, sensors, events, camera frames, lidar and the play-area boundary.
+
+| `format=` | What | Opens with | Axes |
+|---|---|---|---|
+| `"json"` (default) | the dashboard's JSON export, plus camera/lidar and raw media | anything | as recorded |
+| `"lerobot"` | LeRobot dataset | [LeRobot](https://github.com/huggingface/lerobot), `lerobot-dataset-viz` | right-handed Y-up |
+| `"mcap"` | rosbag2 bag of ROS 2 messages | Foxglove, `ros2 bag play`, rviz2, PlotJuggler | ROS (REP-103) |
+| `"hdf5"` | robomimic demonstrations (`hdf5_layout="aloha"` for ACT) | robomimic / Isaac Lab Mimic, ACT | ROS (REP-103) |
+| `"rlds"` | Open X-Embodiment TFDS folder | `tfds.builder_from_directory(path)`, Octo, OpenVLA | ROS (REP-103) |
+
+```bash
+pip install "cognitive3dpy[json]"      # or [mcap], [hdf5], [rlds]
+pip install "cognitive3dpy[lerobot]"   # Python 3.12+; cannot be combined with the pandas extra
+```
+
+```python
+import cognitive3dpy as c3d
+from cognitive3dpy import session_downloader
+
+c3d.c3d_auth()  # reads C3D_API_KEY
+session_downloader.download(output="datasets", project_id=700, session_id="1790083950_tb4-sim-fedora")
+session_downloader.download(output="datasets", project_id=700, session_id="1790083950_tb4-sim-fedora", format="lerobot")
+```
+
+A session is written to `datasets/cognitive3d/<session_id>/`, whatever the format. If that folder already holds another format, the download goes to `<session_id>_<format>/` (`_json`, `_lerobot`, `_mcap`, `_hdf5`, `_rlds`) instead. Downloading again into a folder that exists replaces the files the new download also has and keeps the rest (`overwrite=False` raises instead). Each download is read back to check it (`validate=False` skips that), and progress bars show each step. Camera frames and lidar scans are cached, so another format of the same session only re-fetches the JSON.
+
+### LeRobot
+
+The dataset is checked by loading it with lerobot, and opens with `LeRobotDataset(repo_id, root=path)` or `result.load()`. To look at it (with `--root` the folder it was written to):
+
+```bash
+lerobot-dataset-viz --repo-id cognitive3d/<session_id> --root datasets/cognitive3d/<session_id> --mode local --episode-index 0
+```
+
+`lerobot-dataset-viz` plots `observation.state` and the camera images; the other features are in the dataset but that viewer does not chart them.
+
+| Feature | Shape | From |
+|---|---|---|
+| `observation.state` | (3,), or (7,) with `head_rotation=True` | head position (+ quaternion) |
+| `observation.gaze` | (3,) | gaze point; NaN when the gaze hit an object |
+| `observation.sensors` | (channels,) | sensor channels, named in the feature's `names` |
+| `observation.event` | (1,) int64 | index into `event_names` in `c3d/download.json`, else -1 |
+| `observation.images.<camera>` | (H, W, 3) | camera frames |
+| `observation.camera.<camera>.pose` | (7,) | camera pose px, py, pz, qx, qy, qz, qw |
+| `observation.lidar.<sensor>.ranges` | (beams,) | laserscan ranges in metres; NaN for no return or out of range |
+| `observation.lidar.<sensor>.scan_index` | (1,) int64 | point cloud held at this step, a file in the sidecar (below); -1 before the first |
+| `observation.lidar.<sensor>.pose` | (7,) | pose of the held lidar scan |
+| `observation.boundary.pose` | (7,) | play-area boundary pose |
+| `observation.boundary.shape_index` | (1,) int64 | boundary polygon in effect, an entry in `boundary.json`; -1 before the first |
+| `observation.c3d_time_ms` | (1,) int64 | real capture time, epoch ms |
+
+- **One session per episode** — pass a list of `session_id`s (with `repo_id="org/name"`) for a multi-episode dataset.
+- **Clock** — frames follow the camera when the session has one, otherwise the gaze stream; `clock="fixed:10"` resamples onto an exact grid. Other streams are sample-and-held.
+- **Coordinates** — Cognitive3D records left-handed, Y-up, metres. LeRobot datasets are converted to right-handed, Y-up by mirroring X (positions `(-x, y, z)`, quaternions `(qx, -qy, -qz, qw)`), like the Cognitive3D replay viewer; `coord="ros"` gives REP-103 axes and `coord="native"` keeps the raw values.
+- **Lidar and boundary in full** — a frame holds only the latest scan, so every scan is also kept in `c3d/sessions/<session_id>/`: `lidar/<sensor>/scans.npz` (all laserscans), one `.npz` per point cloud (`points`, `colors`, `pose`; listed in `index.json`), and `boundary.json` (poses and polygons). Points are sensor-local: `world = rotate(pose.q, point) + pose.p`; `c3d/download.json` gives each laserscan's beam angles and the formula for its points.
+- **Streamed** — camera frames and lidar scans arrive as a few paged streams rather than one request each; deployments without the stream routes fall back to per-item requests (`camera_transport` / `lidar_transport`).
+- **Resumable** — camera frames and lidar scans are cached in `~/.cache/cognitive3dpy` (or `C3D_CACHE_DIR`); an interrupted download resumes and re-runs reuse them.
+- **Other options** — `streams`, `sensors`, `head_rotation`, `task`, `fps`, `repo_id`; see `help(session_downloader.download)`. `session_downloader.inspect(session_id)` lists what a session contains, and `session_downloader.validate(path)` re-checks a download of any format.
+
+### MCAP (ROS 2)
+
+One rosbag2 bag per session: `<session_id>_0.mcap` plus `metadata.yaml`, so `ros2 bag play` on the folder works and Foxglove opens the `.mcap` directly. Messages are standard ROS 2 types at their recorded timestamps (nothing is resampled):
+
+| Topic | Type |
+|---|---|
+| `/tf` | `tf2_msgs/TFMessage`: `map` → `c3d/head`, `c3d/camera/<id>`, `c3d/lidar/<id>`, `c3d/boundary` |
+| `/c3d/head/pose` | `geometry_msgs/PoseStamped` |
+| `/c3d/gaze` | `geometry_msgs/PointStamped` (free-space gaze points only) |
+| `/c3d/sensors/<name>` | `std_msgs/Float64` |
+| `/c3d/events`, `/c3d/session` | `std_msgs/String` (JSON) |
+| camera: the recorded ROS topic + `/compressed`, else `/c3d/camera/<id>/image/compressed` | `sensor_msgs/CompressedImage` (the recorded JPEGs) |
+| lidar: the recorded ROS topic, else `/c3d/lidar/<id>/scan` or `/points` | `sensor_msgs/LaserScan` / `PointCloud2` |
+| `/c3d/boundary` | `geometry_msgs/PolygonStamped` |
+
+Laserscan frames are the scan plane, so `LaserScan` messages read exactly as recorded.
+
+### HDF5 (robomimic / ALOHA)
+
+`hdf5_layout="robomimic"` (default) writes one `<session_id>.hdf5` with `data/demo_<i>/{obs/*, actions, states, rewards, dones}`, `data.attrs["env_args"]` and `mask/train`, the layout robomimic and Isaac Lab Mimic read. `hdf5_layout="aloha"` writes `episode_<i>.hdf5` with `observations/{qpos, qvel, images/<camera>}` and `action`, as ACT reads it. The state is the head pose (`observation.state`), the action is the next step's state, and every other feature is an extra observation (`front_image`, `gaze`, `lidar_scan_ranges`, ...). For robomimic training, set `train.hdf5_load_next_obs=False` (no `next_obs` group is written).
+
+### RLDS (Open X-Embodiment)
+
+A TFDS folder (`features.json`, `dataset_info.json`, TFRecord shards) written without TensorFlow; load it with `tfds.builder_from_directory(<folder>)`. Each session is an episode whose `steps` hold `observation` (the clock camera as `image`, other cameras as `<camera>_image`, `state`, ...), `action` (the next step's state), `reward`, `discount`, `is_first` / `is_last` / `is_terminal` and `language_instruction` (`task`); `episode_metadata` has the session and project ids.
+
+### JSON
+
+The session as the dashboard exports it: the same `gaze_<session_id>.json`, `events_...`, `sensors_...`, `fixation_...`, `dynamics_...`, `boundary_...` and `space_visits_...` files, byte for byte (times in epoch seconds). The dashboard export leaves out cameras and lidar, so `camera_<session_id>.json` and `lidar_<session_id>.json` come from the replay API as served (times in seconds from the session start, `date` in epoch ms), and the frames and scans are saved as recorded under `camera/<version>/<camera>/` and `lidar/<version>/<sensor>/`. `c3d/download.json` documents these conventions and the lidar blob layouts.
+
 ## Configuration
+
+### API host
+
+Requests go to `https://api.cognitive3d.com`. To use another environment, set `C3D_BASE_URL` before the first API call:
+
+```bash
+export C3D_BASE_URL=https://api.c3ddev.com
+```
 
 ### Timeout
 
@@ -192,7 +290,7 @@ All data-fetching functions support these session filters:
 ```bash
 git clone https://github.com/CognitiveVR/cognitive3dpy.git
 cd cognitive3dpy
-uv sync --all-extras  # installs package + dev + pandas dependencies
+uv sync --all-groups --extra pandas  # installs package + dev + pandas dependencies
 uv run pytest tests/  # run tests
 ```
 

@@ -48,11 +48,19 @@ class C3DAPIError(C3DError):
     """Raised on any other non-2xx response."""
 
 
+def get_base_url() -> str:
+    """Return the API host: ``C3D_BASE_URL`` if set, otherwise ``BASE_URL``."""
+    url = os.environ.get("C3D_BASE_URL", "").strip().rstrip("/")
+    if url.endswith("/v0"):
+        url = url[: -len("/v0")]
+    return url or BASE_URL
+
+
 def _get_client() -> httpx.Client:
     """Return a reusable httpx client, creating one if needed."""
     global _client
     if _client is None or _client.is_closed:
-        _client = httpx.Client(base_url=BASE_URL, timeout=_timeout)
+        _client = httpx.Client(base_url=get_base_url(), timeout=_timeout)
     return _client
 
 

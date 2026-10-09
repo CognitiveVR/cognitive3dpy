@@ -18,6 +18,42 @@ pandas = [
     "pandas>=3.0",
     "pyarrow>=23.0.1",
 ]
+# session_downloader: Cognitive3D sessions as robot-learning datasets
+lerobot = [
+    "lerobot[dataset]>=0.6,<0.7; python_version >= '3.12'",
+    "numpy>=2.0",
+    "pillow>=10.0",
+    "tqdm>=4.66",
+    "zstandard>=0.22",
+]
+mcap = [
+    "mcap>=1.2",
+    "mcap-ros2-support>=0.5",
+    "numpy>=2.0",
+    "pillow>=10.0",
+    "tqdm>=4.66",
+    "zstandard>=0.22",
+]
+hdf5 = [
+    "h5py>=3.10",
+    "numpy>=2.0",
+    "pillow>=10.0",
+    "tqdm>=4.66",
+    "zstandard>=0.22",
+]
+json = [
+    "numpy>=2.0",
+    "pillow>=10.0",
+    "tqdm>=4.66",
+    "zstandard>=0.22",
+]
+rlds = [
+    "google-crc32c>=1.5",
+    "numpy>=2.0",
+    "pillow>=10.0",
+    "tqdm>=4.66",
+    "zstandard>=0.22",
+]
 
 [build-system]
 requires = ["hatchling", "pyyaml"]
@@ -28,14 +64,29 @@ path = "build_hooks.py"
 
 [dependency-groups]
 dev = [
+    "google-crc32c>=1.5",
+    "h5py>=3.10",
     "ipykernel>=7.2.0",
+    "mcap>=1.2",
+    "mcap-ros2-support>=0.5",
     "mypy>=1.19.1",
+    "numpy>=2.0",
+    "pillow>=10.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "python-semantic-release>=9.0.0",
     "respx>=0.22.0",
     "pyyaml>=6.0",
+    "rosbags>=0.10",
     "ruff>=0.15.2",
+    "tqdm>=4.66",
+    "zstandard>=0.22",
+]
+
+[tool.uv]
+# lerobot 0.6 pins pandas<3, the pandas extra needs pandas>=3
+conflicts = [
+    [{ extra = "pandas" }, { extra = "lerobot" }],
 ]
 
 [tool.ruff]
@@ -47,6 +98,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["live: hits the real Cognitive3D API (opt in with C3D_LIVE_TESTS=1)"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
