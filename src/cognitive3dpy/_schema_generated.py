@@ -3,7 +3,7 @@
 DO NOT EDIT MANUALLY. Regenerate with:
     uv run python scripts/sync_schema.py
 
-Source: slicer_fields.yaml (sha256:d6d7d7008845)
+Source: slicer_fields.yaml (sha256:5fec18f9b443)
 """
 
 from __future__ import annotations
